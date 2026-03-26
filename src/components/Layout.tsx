@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { isSameDay, format } from 'date-fns';
-import { MOCK_PRAYERS } from '../constants';
+import { format } from 'date-fns';
 import { cn } from '../lib/utils';
 import { AppTab } from '../types';
 import { Home, Calendar, Scan, Info, Menu, X, Settings, Bell, Moon, Star, ExternalLink } from 'lucide-react';
+import { useSchedule } from '../hooks/useSchedule';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,6 +16,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(false);
+  const { schedule } = useSchedule(new Date());
 
   useEffect(() => {
     if (isDarkMode) {
@@ -43,14 +44,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   useEffect(() => {
     if (!isNotificationsEnabled) return;
 
+    const parseIqamaCandidates = (value: string) => value.split('/').map((t) => t.trim());
+
     const checkPrayers = () => {
       const now = new Date();
-      const todaySchedule = MOCK_PRAYERS.find(p => isSameDay(p.date, now)) || MOCK_PRAYERS[1];
+      const todayDateKey = format(now, 'yyyy-MM-dd');
+      const todaySchedule = schedule?.days.find((day) => day.dateStr === todayDateKey);
+      if (!todaySchedule) return;
       const currentTimeStr = format(now, 'HH:mm');
 
       todaySchedule.prayers.forEach(prayer => {
         if (prayer.athan === currentTimeStr) {
-          const key = `notif_athan_${prayer.name}_${currentTimeStr}`;
+          const key = `notif_athan_${todayDateKey}_${prayer.name}_${currentTimeStr}`;
           if (!localStorage.getItem(key)) {
             try {
               if ('Notification' in window && Notification.permission === 'granted') {
@@ -65,28 +70,30 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
           }
         }
         
-        if (prayer.iqama === currentTimeStr) {
-          const key = `notif_iqama_${prayer.name}_${currentTimeStr}`;
-          if (!localStorage.getItem(key)) {
-            try {
-              if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(`${prayer.name} Iqama is starting`, {
-                  body: `The Iqama for ${prayer.name} is starting now (${prayer.iqama}).`
-                });
+        parseIqamaCandidates(prayer.iqama).forEach((iqamaTime) => {
+          if (iqamaTime === currentTimeStr) {
+            const key = `notif_iqama_${todayDateKey}_${prayer.name}_${iqamaTime}`;
+            if (!localStorage.getItem(key)) {
+              try {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  new Notification(`${prayer.name} Iqama is starting`, {
+                    body: `The Iqama for ${prayer.name} is starting now (${iqamaTime}).`
+                  });
+                }
+              } catch (e) {
+                console.error(e);
               }
-            } catch (e) {
-              console.error(e);
+              localStorage.setItem(key, 'true');
             }
-            localStorage.setItem(key, 'true');
           }
-        }
+        });
       });
     };
 
     checkPrayers();
     const interval = setInterval(checkPrayers, 30000); // Check every 30 seconds
     return () => clearInterval(interval);
-  }, [isNotificationsEnabled]);
+  }, [isNotificationsEnabled, schedule]);
 
   return (
     <div className="min-h-screen pb-24">

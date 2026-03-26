@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { MapPin, Globe, Instagram, Building2, Navigation, Share2, ArrowLeft, MessageCircle, Users } from 'lucide-react';
+import { MapPin, Globe, Mail, Instagram, Building2, Navigation, Share2, ArrowLeft, MessageCircle, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface InfoScreenProps {
@@ -54,11 +54,13 @@ export const InfoScreen: React.FC<InfoScreenProps> = ({ onLocationClick }) => {
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/10 shadow-sm flex flex-col justify-between">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-secondary-container rounded-lg">
-              <Globe className="w-5 h-5 text-primary" />
+              <Mail className="w-5 h-5 text-primary" />
             </div>
-            <h2 className="font-headline font-bold text-lg text-on-surface">Website</h2>
+            <h2 className="font-headline font-bold text-lg text-on-surface">Contact Email</h2>
           </div>
-          <a href="https://www.surreyisoc.com" className="font-body text-primary font-semibold hover:underline text-sm">www.surreyisoc.com</a>
+          <a href="mailto:info@surreyisoc.com" className="font-body text-primary font-semibold hover:underline text-sm break-all">
+            info@surreyisoc.com
+          </a>
         </div>
 
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/10 shadow-sm flex flex-col justify-between">

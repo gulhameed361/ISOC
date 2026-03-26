@@ -11,6 +11,8 @@ import { InfoScreen } from './components/InfoScreen';
 import { LocationDetailScreen } from './components/LocationDetailScreen';
 import { AppTab } from './types';
 
+const DEFAULT_START_MONTH = 2; // March
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -19,7 +21,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [selectedMonth, setSelectedMonth] = useState<number>(Math.max(new Date().getMonth(), DEFAULT_START_MONTH));
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -131,7 +133,7 @@ export default function App() {
         return (
           <ScheduleScreen 
             selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
+            onMonthChange={(month) => setSelectedMonth(Math.max(month, DEFAULT_START_MONTH))}
             onDateChange={(date) => {
               setSelectedDate(date);
               setActiveTab('home');

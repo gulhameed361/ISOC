@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { CloudUpload, FileText, ChevronRight, Sparkles, ScanLine, Camera, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Sparkles, ScanLine, Camera, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { parseTimetableImage } from '../services/geminiService';
 import { db, auth } from '../firebase';
@@ -203,39 +203,12 @@ export const ScanScreen: React.FC = () => {
       </div>
 
       {/* History */}
-      <section className="mt-8">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-headline font-bold text-lg text-primary">Upload History</h3>
-          <button className="text-xs font-semibold text-primary/70 hover:text-primary transition-colors">View All</button>
-        </div>
-        <div className="space-y-3">
-          <HistoryItem 
-            name="Ramadan_Schedule_2024.pdf" 
-            status="Successfully Synced" 
-            date="March 12, 2024" 
-          />
-          <HistoryItem 
-            name="Friday_Special_Timings.jpg" 
-            status="Archived" 
-            date="Feb 28, 2024" 
-          />
-        </div>
+      <section className="mt-8 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/10">
+        <h3 className="font-headline font-bold text-lg text-primary mb-2">Upload History</h3>
+        <p className="text-xs text-on-surface-variant">
+          Upload history is empty until schedules are uploaded from this app version.
+        </p>
       </section>
     </div>
   );
 };
-
-const HistoryItem = ({ name, status, date }: { name: string, status: string, date: string }) => (
-  <div className="bg-surface-container-lowest p-4 rounded-xl flex items-center justify-between hover:bg-surface-container transition-colors cursor-pointer group shadow-sm border border-outline-variant/5">
-    <div className="flex items-center gap-4">
-      <div className="w-10 h-10 rounded-lg bg-secondary-container flex items-center justify-center">
-        <FileText className="w-5 h-5 text-primary" />
-      </div>
-      <div>
-        <h4 className="font-bold text-on-surface text-sm">{name}</h4>
-        <p className="text-[10px] text-on-surface-variant">Uploaded {date} • {status}</p>
-      </div>
-    </div>
-    <ChevronRight className="w-5 h-5 text-outline group-hover:text-primary transition-colors" />
-  </div>
-);

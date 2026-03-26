@@ -45,7 +45,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
     iqamaMinutes: parseIqamaMinutes(prayer.iqama),
   }));
 
-  let currentPrayer: typeof todaySchedule.prayers[number] | null = null;
+  const startedPrayerEvents = prayerEvents.filter(
+    (event) => event.athanMinutes !== null && event.athanMinutes <= currentMinutes
+  );
+  const lastStartedPrayer = startedPrayerEvents.length > 0 ? startedPrayerEvents[startedPrayerEvents.length - 1] : null;
+
+  let currentPrayer: typeof todaySchedule.prayers[number] | null = lastStartedPrayer?.prayer || null;
   let targetPrayer: typeof todaySchedule.prayers[number] | null = null;
   let countdownTarget: Date | null = null;
   let countdownLabel = 'Athan In';
@@ -151,11 +156,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white/5 p-3 rounded-xl border border-white/10">
               <p className="text-[9px] text-white/50 uppercase font-bold tracking-wider mb-1">{nextPrayer?.name} Athan</p>
-              <p className="text-xl font-bold tabular-nums">{nextPrayer?.athan || '--:--'}</p>
+              <p className="text-lg font-bold tabular-nums text-center leading-tight">{nextPrayer?.athan || '--:--'}</p>
             </div>
             <div className="bg-white/5 p-3 rounded-xl border border-white/10">
               <p className="text-[9px] text-white/50 uppercase font-bold tracking-wider mb-1">{nextPrayer?.name} Iqama</p>
-              <p className="text-xl font-bold tabular-nums">{nextPrayer?.iqama || '--:--'}</p>
+              <p className="text-lg font-bold tabular-nums text-center leading-tight">{nextPrayer?.iqama || '--:--'}</p>
             </div>
           </div>
         </div>

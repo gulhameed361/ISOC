@@ -12,7 +12,6 @@ interface ScheduleScreenProps {
 }
 
 const MONTHS = [
-  { name: 'February', id: 1 },
   { name: 'March', id: 2 },
   { name: 'April', id: 3 },
   { name: 'May', id: 4 },

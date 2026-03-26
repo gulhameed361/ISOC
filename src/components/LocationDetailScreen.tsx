@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Share2, MapPin, Clock, Phone, Mail, Building2, Waves, BookOpen, Coffee, Navigation } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -13,20 +13,27 @@ const LOCATIONS_DATA: Record<string, any> = {
     name: 'Islamic Prayer Centre',
     address: 'Main Campus Hub, Surrey University, GU2 7XH',
     mapUrl: 'https://www.google.com/maps/dir/?api=1&destination=51.2435,-0.5895',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC82_C7E-mY62BfW9gAQvBmpB42_hDXu0osh-iDqOMWZpbiq1i6AFnUkWp6Fxk3KHu1VOmKYQgKm9fDTXWZFiuc_Il7kfwuLU98xTM_YVj2so54zOH6AsyP8gon6KsY-RDnmGtwcg-PMoLAjFVy0ArxgC2mUntW7cJ2KWZ-YSLsnqQ0UCi0TYaFk_8XXJemmImuU27HF4B0xtzhCCoJlRUPAIy0iPQc8ym33m2S9fJWsgHOAHahIluMN_8a4ck9626UiPgbKWtew',
+    image: '/images/islamic-prayer-centre.jpg',
+    fallbackImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC82_C7E-mY62BfW9gAQvBmpB42_hDXu0osh-iDqOMWZpbiq1i6AFnUkWp6Fxk3KHu1VOmKYQgKm9fDTXWZFiuc_Il7kfwuLU98xTM_YVj2so54zOH6AsyP8gon6KsY-RDnmGtwcg-PMoLAjFVy0ArxgC2mUntW7cJ2KWZ-YSLsnqQ0UCi0TYaFk_8XXJemmImuU27HF4B0xtzhCCoJlRUPAIy0iPQc8ym33m2S9fJWsgHOAHahIluMN_8a4ck9626UiPgbKWtew',
     facilities: ['Main Prayer Hall', 'Wudu Area', 'Library', 'Quiet Study Space']
   },
   'manor-park': {
     name: 'Manor Park Prayer Room',
     address: 'JB01-10, James Black Road, Manor Park, GU2 7YW',
     mapUrl: 'https://www.google.com/maps/dir/?api=1&destination=51.2415,-0.6025',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDbrCPNVT8FTkaWmyajumo6mzGgentPCnpct0hFYlJmUbS7mn-yeTvUckfsLRhtR5bIx3sZpWCVVg4d0IaVi1BozUIrT_ZI6N7FoSYsbRtcai8JRQ-3Yg3VOJXzJs3GVCryYeuEYU6x3_s-Zy27C7GA3fPted-WJHS1RiwSiMHKPmt3LfIm1IJKO4LVVzBFMMYqmVsghTB-K2BpSViwixbWwognrAxM9U9Eu6uwyUwgyQ9JLfrORp_606IERARGiEzCIxY_NdERTg',
+    image: '/images/manor-park-prayer-room.png',
+    fallbackImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDbrCPNVT8FTkaWmyajumo6mzGgentPCnpct0hFYlJmUbS7mn-yeTvUckfsLRhtR5bIx3sZpWCVVg4d0IaVi1BozUIrT_ZI6N7FoSYsbRtcai8JRQ-3Yg3VOJXzJs3GVCryYeuEYU6x3_s-Zy27C7GA3fPted-WJHS1RiwSiMHKPmt3LfIm1IJKO4LVVzBFMMYqmVsghTB-K2BpSViwixbWwognrAxM9U9Eu6uwyUwgyQ9JLfrORp_606IERARGiEzCIxY_NdERTg',
     facilities: ['Prayer Room', 'Ablution Facilities', 'Student Lounge']
   }
 };
 
 export const LocationDetailScreen: React.FC<LocationDetailProps> = ({ locationId, onBack }) => {
   const data = LOCATIONS_DATA[locationId] || LOCATIONS_DATA['ipc'];
+  const [imageSrc, setImageSrc] = useState(data.image);
+
+  useEffect(() => {
+    setImageSrc(data.image);
+  }, [locationId, data.image]);
 
   const handleGetDirections = () => {
     window.open(data.mapUrl, '_blank');
@@ -50,7 +57,8 @@ export const LocationDetailScreen: React.FC<LocationDetailProps> = ({ locationId
         <img 
           alt={data.name} 
           className="w-full h-full object-cover"
-          src={data.image}
+          src={imageSrc}
+          onError={() => setImageSrc(data.fallbackImage || data.image)}
           referrerPolicy="no-referrer"
         />
         <div className="absolute bottom-4 right-4 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-primary border border-outline-variant/10 tracking-widest uppercase">

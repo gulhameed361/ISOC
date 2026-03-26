@@ -25,41 +25,74 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
     return () => clearInterval(timer);
   }, []);
 
-  // Calculate current and next prayer
-  const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-  let currentPrayerIdx = -1;
-  let nextPrayerIdx = 0;
+  const parseMinutes = (value: string | undefined) => {
+    if (!value || !value.includes(':')) return null;
+    const [h, m] = value.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
+  };
 
-  if (todaySchedule && todaySchedule.prayers) {
-    for (let i = 0; i < todaySchedule.prayers.length; i++) {
-      const timeStr = todaySchedule.prayers[i].athan;
-      if (timeStr && timeStr.includes(':')) {
-        const [h, m] = timeStr.split(':').map(Number);
-        if (currentMinutes >= h * 60 + m) {
-          currentPrayerIdx = i;
-        }
-      }
+  const parseIqamaMinutes = (value: string | undefined) => {
+    if (!value) return null;
+    const candidates = value.split('/').map((part) => parseMinutes(part.trim())).filter((n): n is number => n !== null);
+    return candidates.length > 0 ? candidates[0] : null;
+  };
+
+  const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+  const prayerEvents = (todaySchedule?.prayers || []).map((prayer) => ({
+    prayer,
+    athanMinutes: parseMinutes(prayer.athan),
+    iqamaMinutes: parseIqamaMinutes(prayer.iqama),
+  }));
+
+  let currentPrayer: typeof todaySchedule.prayers[number] | null = null;
+  let targetPrayer: typeof todaySchedule.prayers[number] | null = null;
+  let countdownTarget: Date | null = null;
+  let countdownLabel = 'Athan In';
+  let heroSubLabel = 'Next';
+
+  const firstPrayer = prayerEvents.find((event) => event.athanMinutes !== null);
+  const firstPrayerAthan = firstPrayer?.athanMinutes ?? null;
+
+  for (let i = 0; i < prayerEvents.length; i++) {
+    const event = prayerEvents[i];
+    if (event.athanMinutes === null) continue;
+
+    // Before the next Athan: count down to Athan.
+    if (currentMinutes < event.athanMinutes) {
+      targetPrayer = event.prayer;
+      countdownLabel = 'Athan In';
+      heroSubLabel = 'Next';
+      countdownTarget = new Date(currentTime);
+      countdownTarget.setHours(Math.floor(event.athanMinutes / 60), event.athanMinutes % 60, 0, 0);
+      break;
     }
-    nextPrayerIdx = currentPrayerIdx + 1;
-    if (nextPrayerIdx >= todaySchedule.prayers.length) {
-      nextPrayerIdx = 0;
+
+    // After Athan and before Iqama: count down to Iqama for the same prayer.
+    if (event.iqamaMinutes !== null && currentMinutes >= event.athanMinutes && currentMinutes < event.iqamaMinutes) {
+      currentPrayer = event.prayer;
+      targetPrayer = event.prayer;
+      countdownLabel = 'Iqama In';
+      heroSubLabel = 'Current';
+      countdownTarget = new Date(currentTime);
+      countdownTarget.setHours(Math.floor(event.iqamaMinutes / 60), event.iqamaMinutes % 60, 0, 0);
+      break;
     }
   }
 
-  const currentPrayer = currentPrayerIdx >= 0 ? todaySchedule?.prayers?.[currentPrayerIdx] : null;
-  const nextPrayer = todaySchedule?.prayers?.[nextPrayerIdx];
+  // If after all prayer windows, count down to tomorrow's first Athan.
+  if (!countdownTarget && firstPrayerAthan !== null && firstPrayer?.prayer) {
+    targetPrayer = firstPrayer.prayer;
+    countdownLabel = 'Athan In';
+    heroSubLabel = 'Next';
+    countdownTarget = addDays(new Date(currentTime), 1);
+    countdownTarget.setHours(Math.floor(firstPrayerAthan / 60), firstPrayerAthan % 60, 0, 0);
+  }
 
-  let timeLeftStr = "--:--:--";
-  if (nextPrayer && nextPrayer.athan && nextPrayer.athan.includes(':')) {
-    const [nextH, nextM] = nextPrayer.athan.split(':').map(Number);
-    let targetTime = new Date(currentTime);
-    targetTime.setHours(nextH, nextM, 0, 0);
-
-    if (currentMinutes >= nextH * 60 + nextM) {
-      targetTime = addDays(targetTime, 1);
-    }
-
-    const diffMs = targetTime.getTime() - currentTime.getTime();
+  const nextPrayer = targetPrayer;
+  let timeLeftStr = '--:--:--';
+  if (countdownTarget) {
+    const diffMs = countdownTarget.getTime() - currentTime.getTime();
     if (diffMs > 0) {
       const h = Math.floor(diffMs / (1000 * 60 * 60));
       const m = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -67,6 +100,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
       timeLeftStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     }
   }
+
+  const isFriday = selectedDate.getDay() === 5;
+  const fridayDhuhr = todaySchedule?.prayers?.find((prayer) => prayer.name === 'Dhuhr');
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -106,7 +142,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
           </div>
           
           <div className="mb-8">
-            <p className="text-white/60 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Next: {nextPrayer?.name || 'Loading'}</p>
+            <p className="text-white/60 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">{heroSubLabel}: {nextPrayer?.name || 'Loading'} ({countdownLabel})</p>
             <div className="flex items-baseline gap-3">
               <span className="font-headline font-black text-6xl tracking-tighter tabular-nums">{timeLeftStr}</span>
             </div>
@@ -201,16 +237,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
         })}
       </section>
 
-      {/* Jumu'ah Reminder */}
-      <section className="p-6 bg-tertiary-fixed/30 rounded-xl border border-tertiary/10 flex items-start gap-4">
-        <Info className="w-5 h-5 text-tertiary shrink-0" />
-        <div>
-          <p className="font-headline font-bold text-on-tertiary-fixed-variant text-sm mb-1">Jumu'ah Reminder</p>
-          <p className="text-xs text-on-tertiary-fixed-variant/80 leading-relaxed">
-            Tomorrow's Jumu'ah khutbah will be delivered by Sheikh Ahmed at 13:15. Please arrive early to ensure a spot.
-          </p>
-        </div>
-      </section>
+      {/* Jumu'ah Reminder (Friday only) */}
+      {isFriday && (
+        <section className="p-6 bg-tertiary-fixed/30 rounded-xl border border-tertiary/10 flex items-start gap-4">
+          <Info className="w-5 h-5 text-tertiary shrink-0" />
+          <div>
+            <p className="font-headline font-bold text-on-tertiary-fixed-variant text-sm mb-1">Jumu'ah Reminder</p>
+            <p className="text-xs text-on-tertiary-fixed-variant/80 leading-relaxed">
+              Jumu'ah is shown in today&apos;s timetable (Dhuhr Iqama: {fridayDhuhr?.iqama || 'TBC'}). Place: to be announced.
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* Rate App Button */}
       <a 

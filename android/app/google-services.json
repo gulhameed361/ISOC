@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "398749390897-l931t0b4i8i7f7bcbjmdig20fqsivr7i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.surreyisoc.prayerroom",
+            "certificate_hash": "bf78a8929b47accfba1b1942d6e28325df25c2e4"
+          }
+        },
+        {
           "client_id": "398749390897-mogca87p9bndoabn5l1g9udmb5l95r04.apps.googleusercontent.com",
           "client_type": 3
         }

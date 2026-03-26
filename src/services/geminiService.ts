@@ -1,8 +1,19 @@
 import { GoogleGenAI, Type } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const geminiApiKey =
+  import.meta.env.VITE_GEMINI_API_KEY ||
+  import.meta.env.GEMINI_API_KEY ||
+  (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined);
+
+const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
 export async function parseTimetableImage(base64Image: string, mimeType: string) {
+  if (!ai) {
+    throw new Error(
+      'Gemini API key is missing. Set VITE_GEMINI_API_KEY in your .env and rebuild.'
+    );
+  }
+
   const prompt = `
     Extract the prayer timetable from this image.
     The image contains a table with columns for Date, Fajr (Athan, Iqama), Sunrise, Dhuhr (Athan, Iqama), Asr (Athan, Iqama), Maghrib (Athan, Iqama), and Isha (Athan, Iqama).

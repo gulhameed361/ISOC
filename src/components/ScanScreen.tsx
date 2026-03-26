@@ -70,7 +70,9 @@ export const ScanScreen: React.FC = () => {
       }
     } catch (error) {
       console.error("Scan error:", error);
-      setScanStatus("Failed to parse image. Please try again.");
+      const message =
+        error instanceof Error ? error.message : "Failed to parse image. Please try again.";
+      setScanStatus(message);
     } finally {
       setIsScanning(false);
     }

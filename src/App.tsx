@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, User } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithCredential, GoogleAuthProvider, User } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth, googleProvider } from './firebase';
 import { Layout } from './components/Layout';
 import { HomeScreen } from './components/HomeScreen';
@@ -21,17 +22,6 @@ export default function App() {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
 
   useEffect(() => {
-    // On native platforms, login uses redirect flow instead of popup.
-    if (Capacitor.isNativePlatform()) {
-      getRedirectResult(auth).then(() => {
-        setIsLoggingIn(false);
-      }).catch((error: any) => {
-        setIsLoggingIn(false);
-        setAuthError(error?.code ? `${error.code}: ${error.message}` : 'Redirect login failed.');
-        console.error('Redirect login failed:', error);
-      });
-    }
-
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsAuthReady(true);
@@ -47,7 +37,20 @@ export default function App() {
       googleProvider.setCustomParameters({ prompt: 'select_account' });
 
       if (Capacitor.isNativePlatform()) {
-        await signInWithRedirect(auth, googleProvider);
+        const result = await FirebaseAuthentication.signInWithGoogle({
+          scopes: ['email', 'profile'],
+          skipNativeAuth: true,
+        });
+
+        const idToken = result.credential?.idToken;
+        const accessToken = result.credential?.accessToken;
+        if (!idToken && !accessToken) {
+          throw new Error('Missing Google credential token from native sign-in.');
+        }
+
+        const credential = GoogleAuthProvider.credential(idToken ?? undefined, accessToken ?? undefined);
+        await signInWithCredential(auth, credential);
+        setIsLoggingIn(false);
         return;
       }
 

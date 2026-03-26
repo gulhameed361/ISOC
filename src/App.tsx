@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { onAuthStateChanged, signInWithPopup, User } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, User } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
 import { auth, googleProvider } from './firebase';
 import { Layout } from './components/Layout';
 import { HomeScreen } from './components/HomeScreen';
@@ -18,6 +19,13 @@ export default function App() {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
 
   useEffect(() => {
+    // On native platforms, login uses redirect flow instead of popup.
+    if (Capacitor.isNativePlatform()) {
+      getRedirectResult(auth).catch((error) => {
+        console.error('Redirect login failed:', error);
+      });
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsAuthReady(true);
@@ -27,6 +35,13 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+      if (Capacitor.isNativePlatform()) {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Login failed:", error);

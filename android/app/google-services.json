@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "398749390897",
+    "project_id": "gen-lang-client-0970134198",
+    "storage_bucket": "gen-lang-client-0970134198.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:398749390897:android:43b1fb5c80cf7293ce1d10",
+        "android_client_info": {
+          "package_name": "com.surreyisoc.prayerroom"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "398749390897-mogca87p9bndoabn5l1g9udmb5l95r04.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBJKIvavkEG1sekz7V41q3gmbNgplDzKs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "398749390897-mogca87p9bndoabn5l1g9udmb5l95r04.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

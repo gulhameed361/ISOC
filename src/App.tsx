@@ -62,7 +62,7 @@ export default function App() {
       setAuthError(
         firebaseError?.code
           ? `${firebaseError.code}: ${firebaseError.message ?? 'Authentication failed.'}`
-          : 'Authentication failed. Please try again.'
+          : (firebaseError?.message ?? 'Authentication failed. Please try again.')
       );
       console.error("Login failed:", error);
     }

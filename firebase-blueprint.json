@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "MonthlySchedule": {
+      "title": "MonthlySchedule",
+      "description": "Prayer timetable for a specific month",
+      "type": "object",
+      "properties": {
+        "month": {
+          "type": "string",
+          "description": "The month and year, e.g., '2026-03'"
+        },
+        "uploadedBy": {
+          "type": "string",
+          "description": "UID of the user who uploaded the schedule"
+        },
+        "uploadedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the schedule was uploaded"
+        },
+        "days": {
+          "type": "array",
+          "description": "Array of daily schedules",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dateStr": { "type": "string" },
+              "hijriDate": { "type": "string" },
+              "sunrise": { "type": "string" },
+              "prayers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "athan": { "type": "string" },
+                    "iqama": { "type": "string" }
+                  },
+                  "required": ["name", "athan", "iqama"]
+                }
+              }
+            },
+            "required": ["dateStr", "hijriDate", "sunrise", "prayers"]
+          }
+        }
+      },
+      "required": ["month", "uploadedBy", "uploadedAt", "days"]
+    }
+  },
+  "firestore": {
+    "/schedules/{monthId}": {
+      "schema": { "$ref": "#/entities/MonthlySchedule" },
+      "description": "Stores monthly prayer schedules"
+    }
+  }
+}

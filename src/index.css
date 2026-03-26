@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary: var(--color-primary);
+  --color-primary-container: var(--color-primary-container);
+  --color-on-primary: var(--color-on-primary);
+  
+  --color-secondary: var(--color-secondary);
+  --color-secondary-container: var(--color-secondary-container);
+  --color-on-secondary-container: var(--color-on-secondary-container);
+  
+  --color-tertiary: var(--color-tertiary);
+  --color-tertiary-fixed: var(--color-tertiary-fixed);
+  --color-on-tertiary-fixed-variant: var(--color-on-tertiary-fixed-variant);
+  
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-surface-container: var(--color-surface-container);
+  --color-surface-container-low: var(--color-surface-container-low);
+  --color-surface-container-high: var(--color-surface-container-high);
+  --color-surface-container-highest: var(--color-surface-container-highest);
+  --color-surface-container-lowest: var(--color-surface-container-lowest);
+  
+  --color-on-surface: var(--color-on-surface);
+  --color-on-surface-variant: var(--color-on-surface-variant);
+  --color-outline: var(--color-outline);
+  --color-outline-variant: var(--color-outline-variant);
+  
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+}
+
+@layer base {
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Public+Sans:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --color-primary: #37563b;
+    --color-primary-container: #4f6f52;
+    --color-on-primary: #ffffff;
+    
+    --color-secondary: #596244;
+    --color-secondary-container: #dee7c0;
+    --color-on-secondary-container: #5f6849;
+    
+    --color-tertiary: #694a00;
+    --color-tertiary-fixed: #ffdea6;
+    --color-on-tertiary-fixed-variant: #5e4200;
+    
+    --color-background: #fbf9f5;
+    --color-surface: #fbf9f5;
+    --color-surface-container: #efeeea;
+    --color-surface-container-low: #f5f3ef;
+    --color-surface-container-high: #eae8e4;
+    --color-surface-container-highest: #e4e2de;
+    --color-surface-container-lowest: #ffffff;
+    
+    --color-on-surface: #1b1c1a;
+    --color-on-surface-variant: #424841;
+    --color-outline: #737971;
+    --color-outline-variant: #c2c8bf;
+  }
+
+  .dark {
+    --color-primary: #9cd69e;
+    --color-primary-container: #1f3f26;
+    --color-on-primary: #003915;
+    
+    --color-secondary: #c2cbab;
+    --color-secondary-container: #414a2d;
+    --color-on-secondary-container: #dee7c0;
+    
+    --color-tertiary: #eebf6d;
+    --color-tertiary-fixed: #4f3600;
+    --color-on-tertiary-fixed-variant: #ffdea6;
+    
+    --color-background: #121411;
+    --color-surface: #121411;
+    --color-surface-container: #1e201d;
+    --color-surface-container-low: #1a1c19;
+    --color-surface-container-high: #282b27;
+    --color-surface-container-highest: #333531;
+    --color-surface-container-lowest: #0d0f0c;
+    
+    --color-on-surface: #e2e3de;
+    --color-on-surface-variant: #c2c8bf;
+    --color-outline: #8c938a;
+    --color-outline-variant: #424841;
+  }
+
+  body {
+    @apply bg-background text-on-surface font-body antialiased;
+  }
+}
+
+@layer utilities {
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .glass-effect {
+    @apply bg-background/80 backdrop-blur-md;
+  }
+}

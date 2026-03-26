@@ -1,0 +1,8 @@
+{
+  "name": "ISOC Prayer Room",
+  "description": "A modern prayer timetable and community companion app for ISOC Prayer Room, featuring real-time countdowns, monthly schedules, and smart timetable scanning.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

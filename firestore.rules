@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: schedules
+    // Document ID: YYYY-MM (e.g. 2026-03)
+    // Fields:
+    //   - month: string (required)
+    //   - uploadedBy: string (required, immutable)
+    //   - uploadedAt: string (required)
+    //   - days: list (required)
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function uidUnchanged() {
+      return !('uploadedBy' in request.resource.data) ||
+        request.resource.data.uploadedBy == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uploadedBy' in request.resource.data) ||
+        request.resource.data.uploadedBy == resource.data.uploadedBy;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function isValidSchedule() {
+      return hasRequiredFields(['month', 'uploadedBy', 'uploadedAt', 'days']) &&
+             request.resource.data.month is string &&
+             request.resource.data.month.size() > 0 &&
+             request.resource.data.month.size() <= 20 &&
+             request.resource.data.uploadedBy is string &&
+             request.resource.data.uploadedBy.size() > 0 &&
+             request.resource.data.uploadedBy.size() <= 128 &&
+             request.resource.data.uploadedAt is string &&
+             request.resource.data.uploadedAt.size() > 0 &&
+             request.resource.data.uploadedAt.size() <= 50 &&
+             request.resource.data.days is list &&
+             request.resource.data.days.size() <= 31;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    
+    match /schedules/{monthId} {
+      // Anyone authenticated can read the schedules
+      allow read: if isAuthenticated();
+      
+      // Anyone authenticated can create a schedule if it doesn't exist
+      allow create: if isAuthenticated() && 
+                       isValidSchedule() && 
+                       uidUnchanged();
+                       
+      // Only the person who uploaded it can update it
+      allow update: if isAuthenticated() && 
+                       isOwner(resource.data.uploadedBy) &&
+                       isValidSchedule() &&
+                       uidNotModified();
+                       
+      allow delete: if isAuthenticated() && isOwner(resource.data.uploadedBy);
+    }
+  }
+}

@@ -86,7 +86,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         for (let i = 0; i < 7; i++) {
           const targetDate = addDays(now, i);
           const dateKey = format(targetDate, 'yyyy-MM-dd');
-          const daySchedule = schedule.days.find(d => d.dateStr === dateKey);
+          
+          // More robust matching: Parse the date from Firestore and compare formatted strings
+          const daySchedule = schedule.days.find(d => {
+            try {
+              const dDate = new Date(d.dateStr);
+              return format(dDate, 'yyyy-MM-dd') === dateKey;
+            } catch {
+              return d.dateStr === dateKey;
+            }
+          });
 
           if (daySchedule) {
             daySchedule.prayers.forEach(prayer => {
@@ -118,13 +127,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
 
         // 3. Send to native system
         if (notificationsToSchedule.length > 0) {
-          // Send in batches of 50 (Capacitor/Android limit safety)
           for (let i = 0; i < notificationsToSchedule.length; i += 50) {
             await LocalNotifications.schedule({
               notifications: notificationsToSchedule.slice(i, i + 50)
             });
           }
           console.log(`Scheduled ${notificationsToSchedule.length} prayer notifications.`);
+          alert(`Success! Scheduled ${notificationsToSchedule.length} notifications for the week.`);
+        } else {
+          console.warn('No future prayers found to schedule.');
         }
       } catch (error) {
         console.error('Error in batch scheduling:', error);

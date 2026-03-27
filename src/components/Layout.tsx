@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { cn } from '../lib/utils';
 import { AppTab } from '../types';
 import { Home, Calendar, Scan, Info, Menu, X, Settings, Bell, Moon, Star, ExternalLink } from 'lucide-react';
@@ -32,31 +33,38 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     setIsNotificationsEnabled(newState);
     localStorage.setItem('isNotificationsEnabled', newState.toString());
 
-    if (newState && 'Notification' in window) {
+    if (newState) {
       try {
-        if (Notification.permission !== 'granted') {
-          const permission = await Notification.requestPermission();
-          console.log('Notification permission result:', permission);
+        const status = await LocalNotifications.checkPermissions();
+        if (status.display !== 'granted') {
+          const request = await LocalNotifications.requestPermissions();
+          console.log('Notification permission request:', request.display);
         }
       } catch (error) {
-        console.error('Error requesting notification permission:', error);
+        console.error('Error requesting native notification permission:', error);
       }
     }
   };
 
-  const handleTestNotification = () => {
-    if (!('Notification' in window)) {
-      alert('Notifications are not supported by this device/browser.');
-      return;
-    }
-
-    if (Notification.permission === 'granted') {
-      new Notification('ISOC Prayer Room - Test', {
-        body: 'This is a test notification. If you see this, your permissions are correct!',
-        icon: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC7x9onW-FLfHXV-NOvhon53sNsIcJjWJKDblaYYEiHQuEfiaWu-UkVZ5P7sXxCuL4qgRZ_iHdRkUX4QKzqteFddb8HFyKI-cd_93UdbMiBHWrVszhVL7_vzQpqs8vtvTPZ0-BFlxweDtQTH3wg9uvBgnkbFdyrasQK7fP-OQuRtdNBw49IubewtA4UvgSoI400Sbmf65NtJ-WWxb4V-bv2ELt-bsZw6pH5iT5Y_thrKTbn4QJGVn1U_hKGyg8QGMvsbFbcRTcPkA'
+  const handleTestNotification = async () => {
+    try {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            title: 'ISOC Prayer Room - Test',
+            body: 'Native notifications are now active! This will work in the background.',
+            id: 1,
+            schedule: { at: new Date(Date.now() + 1000) },
+            sound: 'beep.wav',
+            attachments: [],
+            actionTypeId: '',
+            extra: null
+          }
+        ]
       });
-    } else {
-      alert(`Notification permission is: ${Notification.permission}. Please turn on Notifications toggle first.`);
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      alert('Failed to send native notification. Check permissions in Android settings.');
     }
   };
 
@@ -76,15 +84,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         if (prayer.athan === currentTimeStr) {
           const key = `notif_athan_${todayDateKey}_${prayer.name}_${currentTimeStr}`;
           if (!localStorage.getItem(key)) {
-            try {
-              if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(`Time for ${prayer.name} Athan`, {
-                  body: `The Athan for ${prayer.name} is at ${prayer.athan}.`
-                });
-              }
-            } catch (e) {
-              console.error(e);
-            }
+            console.log(`Sending native Athan notification for ${prayer.name}`);
+            LocalNotifications.schedule({
+              notifications: [
+                {
+                  title: `Time for ${prayer.name} Athan`,
+                  body: `The Athan for ${prayer.name} is at ${prayer.athan}.`,
+                  id: Math.floor(Math.random() * 1000000),
+                  schedule: { at: new Date(Date.now() + 500) }
+                }
+              ]
+            });
             localStorage.setItem(key, 'true');
           }
         }
@@ -93,15 +103,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
           if (iqamaTime === currentTimeStr) {
             const key = `notif_iqama_${todayDateKey}_${prayer.name}_${iqamaTime}`;
             if (!localStorage.getItem(key)) {
-              try {
-                if ('Notification' in window && Notification.permission === 'granted') {
-                  new Notification(`${prayer.name} Iqama is starting`, {
-                    body: `The Iqama for ${prayer.name} is starting now (${iqamaTime}).`
-                  });
-                }
-              } catch (e) {
-                console.error(e);
-              }
+              console.log(`Sending native Iqama notification for ${prayer.name}`);
+              LocalNotifications.schedule({
+                notifications: [
+                  {
+                    title: `Iqama for ${prayer.name}`,
+                    body: `The Iqama for ${prayer.name} is starting at ${prayer.iqama}.`,
+                    id: Math.floor(Math.random() * 1000000),
+                    schedule: { at: new Date(Date.now() + 500) }
+                  }
+                ]
+              });
               localStorage.setItem(key, 'true');
             }
           }

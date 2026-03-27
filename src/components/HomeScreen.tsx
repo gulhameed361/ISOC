@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { format, addDays, isSameDay } from 'date-fns';
 import { MOCK_PRAYERS } from '../constants';
-import { Bell, Sun, CloudSun, Moon, CloudMoon, Info, Heart, Loader2 } from 'lucide-react';
+import { Bell, Sun, CloudSun, Moon, CloudMoon, Info, Heart, Loader2, Building2, Users, Navigation } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useSchedule } from '../hooks/useSchedule';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface HomeScreenProps {
   onViewCalendar: () => void;
@@ -19,9 +21,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
   const todaySchedule = schedule?.days.find(p => p.dateStr === format(selectedDate, 'yyyy-MM-dd')) || MOCK_PRAYERS.find(p => isSameDay(p.date, selectedDate)) || MOCK_PRAYERS[1];
   
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [jumuahConfig, setJumuahConfig] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    const fetchConfig = async () => {
+      try {
+        const docRef = doc(db, 'configs', 'jumuah');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) setJumuahConfig(docSnap.data().locationId);
+      } catch (e) {
+        console.error("Config error:", e);
+      }
+    };
+    fetchConfig();
     return () => clearInterval(timer);
   }, []);
 
@@ -243,14 +256,61 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
       </section>
 
       {/* Jumu'ah Reminder (Friday only) */}
-      {isFriday && (
-        <section className="p-6 bg-tertiary-fixed/30 rounded-xl border border-tertiary/10 flex items-start gap-4">
-          <Info className="w-5 h-5 text-tertiary shrink-0" />
-          <div>
-            <p className="font-headline font-bold text-on-tertiary-fixed-variant text-sm mb-1">Jumu'ah Reminder</p>
-            <p className="text-xs text-on-tertiary-fixed-variant/80 leading-relaxed">
-              Jumu'ah is shown in today&apos;s timetable (Dhuhr Iqama: {fridayDhuhr?.iqama || 'TBC'}). Place: to be announced.
-            </p>
+      {isFriday && jumuahConfig && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <Users className="w-5 h-5 text-tertiary" />
+            <h2 className="font-headline font-bold text-xl text-on-surface">Confirmed Jumu'ah</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-4">
+            {jumuahConfig === 'university-hall' ? (
+              <div className="p-6 bg-tertiary-fixed/20 rounded-2xl border border-tertiary/10 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:rotate-12 transition-transform">
+                  <Building2 className="w-20 h-20" />
+                </div>
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-headline font-bold text-lg text-on-surface">University Hall</h3>
+                      <p className="text-xs text-on-surface-variant font-medium">1st Khutbah: 1:15 PM</p>
+                    </div>
+                    <div className="bg-tertiary/20 px-3 py-1 rounded-full text-[10px] font-bold text-tertiary uppercase tracking-widest">
+                      Confirmed Venue
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => window.open('https://maps.app.goo.gl/wwzUEqFA4hENz5wt5', '_blank')}
+                    className="w-full py-3 bg-tertiary text-on-tertiary font-bold rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"
+                  >
+                    Get Directions
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-6 bg-secondary-container/30 rounded-2xl border border-primary/10 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:-rotate-12 transition-transform">
+                  <Users className="w-20 h-20" />
+                </div>
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-headline font-bold text-lg text-on-surface">Rubix</h3>
+                      <p className="text-xs text-on-surface-variant font-medium">2nd Khutbah: 2:15 PM</p>
+                    </div>
+                    <div className="bg-primary/20 px-3 py-1 rounded-full text-[10px] font-bold text-primary uppercase tracking-widest">
+                      Confirmed Venue
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => window.open('https://maps.app.goo.gl/ySPYGGyTAASj24y38', '_blank')}
+                    className="w-full py-3 bg-primary text-on-primary font-bold rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"
+                  >
+                    Get Directions
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
       )}

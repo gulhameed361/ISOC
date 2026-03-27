@@ -1,10 +1,10 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, ScanLine, Camera, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Sparkles, ScanLine, Camera, Image as ImageIcon, Loader2, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { parseTimetableImage } from '../services/geminiService';
 import { db, auth } from '../firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 
 export const ScanScreen: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -14,8 +14,49 @@ export const ScanScreen: React.FC = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState<string | null>(null);
   const [scanCount, setScanCount] = useState(() => Number(localStorage.getItem('successfulScans') || '0'));
+  const [history, setHistory] = useState<any[]>([]);
+  const [jumuahLocation, setJumuahLocation] = useState('university-hall');
+  const [isUpdatingJumuah, setIsUpdatingJumuah] = useState(false);
 
   const isLimitReached = scanCount >= 3;
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch History
+        const q = query(collection(db, 'schedules'), orderBy('uploadedAt', 'desc'), limit(5));
+        const querySnapshot = await getDocs(q);
+        const docs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setHistory(docs);
+
+        // Fetch Jumu'ah
+        const jDoc = await getDocs(query(collection(db, 'configs'), limit(1)));
+        const jData = jDoc.docs.find(d => d.id === 'jumuah')?.data();
+        if (jData) setJumuahLocation(jData.locationId);
+      } catch (error) {
+        console.error("Error fetching admin data:", error);
+      }
+    };
+    fetchData();
+  }, [scanStatus]);
+
+  const handleUpdateJumuah = async (locationId: string) => {
+    if (!auth.currentUser) return;
+    setIsUpdatingJumuah(true);
+    try {
+      await setDoc(doc(db, 'configs', 'jumuah'), {
+        locationId,
+        updatedAt: new Date().toISOString(),
+        updatedBy: auth.currentUser.uid
+      });
+      setJumuahLocation(locationId);
+      alert("Jumu'ah location updated for all users!");
+    } catch (error) {
+      console.error("Error updating Jumu'ah:", error);
+    } finally {
+      setIsUpdatingJumuah(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -212,12 +253,61 @@ export const ScanScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* History */}
-      <section className="mt-8 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/10">
-        <h3 className="font-headline font-bold text-lg text-primary mb-2">Upload History</h3>
-        <p className="text-xs text-on-surface-variant">
-          Upload history is empty until schedules are uploaded from this app version.
+      {/* Jumu'ah Admin */}
+      <section className="mt-8 bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant/10 shadow-sm">
+        <h3 className="font-headline font-bold text-xl text-primary mb-4 flex items-center gap-2">
+          <Users className="w-5 h-5" />
+          Set Next Jumu'ah
+        </h3>
+        <p className="text-xs text-on-surface-variant mb-4 font-medium leading-relaxed">
+          Select where the next Friday prayer will be held. This updates for all users.
         </p>
+        <div className="grid grid-cols-2 gap-3">
+          {['university-hall', 'rubix'].map((locId) => (
+            <button
+              key={locId}
+              disabled={isUpdatingJumuah}
+              onClick={() => handleUpdateJumuah(locId)}
+              className={cn(
+                "py-3 px-4 rounded-xl font-bold text-[11px] transition-all border-2 uppercase tracking-widest",
+                jumuahLocation === locId 
+                  ? "bg-primary text-on-primary border-primary shadow-md" 
+                  : "bg-surface-container-low text-on-surface-variant border-outline-variant/10 hover:border-primary/20"
+              )}
+            >
+              {locId === 'university-hall' ? 'University Hall' : 'Rubix'}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* History */}
+      <section className="mt-8 bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant/10 shadow-sm">
+        <h3 className="font-headline font-bold text-xl text-primary mb-4 flex items-center gap-2">
+          <ScanLine className="w-5 h-5" />
+          Update History
+        </h3>
+        <div className="space-y-3">
+          {history.length > 0 ? (
+            history.map((item) => (
+              <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low border border-outline-variant/5">
+                <div>
+                  <h4 className="font-bold text-sm text-on-surface">{item.month}</h4>
+                  <p className="text-[10px] text-on-surface-variant">
+                    Updated {new Date(item.uploadedAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="bg-primary/10 px-2 py-1 rounded text-[9px] font-bold text-primary uppercase">
+                  Active
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-on-surface-variant italic py-2">
+              No recent updates found.
+            </p>
+          )}
+        </div>
       </section>
     </div>
   );

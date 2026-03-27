@@ -81,7 +81,7 @@ export default function App() {
           <img 
             alt="ISOC Logo" 
             className="w-full h-full object-cover"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuC7x9onW-FLfHXV-NOvhon53sNsIcJjWJKDblaYYEiHQuEfiaWu-UkVZ5P7sXxCuL4qgRZ_iHdRkUX4QKzqteFddb8HFyKI-cd_93UdbMiBHWrVszhVL7_vzQpqs8vtvTPZ0-BFlxweDtQTH3wg9uvBgnkbFdyrasQK7fP-OQuRtdNBw49IubewtA4UvgSoI400Sbmf65NtJ-WWxb4V-bv2ELt-bsZw6pH5iT5Y_thrKTbn4QJGVn1U_hKGyg8QGMvsbFbcRTcPkA"
+            src="/images/ISOC.png"
             referrerPolicy="no-referrer"
           />
         </div>

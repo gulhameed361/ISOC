@@ -21,7 +21,7 @@ const LOCATIONS_DATA: Record<string, any> = {
     name: 'Manor Park Prayer Room',
     address: 'JB01-10, James Black Road, Manor Park, GU2 7YW',
     mapUrl: 'https://www.google.com/maps/dir/?api=1&destination=51.2415,-0.6025',
-    image: '/images/manor-park-prayer-room.png',
+    image: '/images/manor-park-prayer-room.jpg',
     fallbackImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDbrCPNVT8FTkaWmyajumo6mzGgentPCnpct0hFYlJmUbS7mn-yeTvUckfsLRhtR5bIx3sZpWCVVg4d0IaVi1BozUIrT_ZI6N7FoSYsbRtcai8JRQ-3Yg3VOJXzJs3GVCryYeuEYU6x3_s-Zy27C7GA3fPted-WJHS1RiwSiMHKPmt3LfIm1IJKO4LVVzBFMMYqmVsghTB-K2BpSViwixbWwognrAxM9U9Eu6uwyUwgyQ9JLfrORp_606IERARGiEzCIxY_NdERTg',
     facilities: ['Prayer Room', 'Ablution Facilities', 'Student Lounge']
   }

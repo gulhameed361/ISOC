@@ -16,7 +16,7 @@ export const InfoScreen: React.FC<InfoScreenProps> = ({ onLocationClick }) => {
           <img 
             alt="Surrey Islamic Society" 
             className="w-20 h-20 object-contain"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWOFxYK3Mb1nBFmW9gAQvBmpB42_hDXu0osh-iDqOMWZpbiq1i6AFnUkWp6Fxk3KHu1VOmKYQgKm9fDTXWZFiuc_Il7kfwuLU98xTM_YVj2so54zOH6AsyP8gon6KsY-RDnmGtwcg-PMoLAjFVy0ArxgC2mUntW7cJ2KWZ-YSLsnqQ0UCi0TYaFk_8XXJemmImuU27HF4B0xtzhCCoJlRUPAIy0iPQc8ym33m2S9fJWsgHOAHahIluMN_8a4ck9626UiPgbKWtew"
+            src="/images/ISOC.png"
             referrerPolicy="no-referrer"
           />
         </div>

@@ -56,9 +56,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
             id: 1,
             schedule: { at: new Date(Date.now() + 1000) },
             sound: 'beep.wav',
-            attachments: [],
-            actionTypeId: '',
-            extra: null
+            smallIcon: 'ic_stat_name'
           }
         ]
       });
@@ -111,7 +109,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                     body: type === 'Athan' ? `The Athan for ${prayer.name} is at ${time}.` : `The Iqama for ${prayer.name} is starting at ${time}.`,
                     id: Math.floor(Math.random() * 10000000),
                     schedule: { at: scheduleDate },
-                    sound: 'beep.wav'
+                    sound: 'beep.wav',
+                    smallIcon: 'ic_stat_name'
                   });
                 }
               };
@@ -133,7 +132,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
             });
           }
           console.log(`Scheduled ${notificationsToSchedule.length} prayer notifications.`);
-          alert(`Success! Scheduled ${notificationsToSchedule.length} notifications for the week.`);
         } else {
           console.warn('No future prayers found to schedule.');
         }
@@ -158,7 +156,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
             <img 
               alt="ISOC Logo" 
               className="w-full h-full object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuC7x9onW-FLfHXV-NOvhon53sNsIcJjWJKDblaYYEiHQuEfiaWu-UkVZ5P7sXxCuL4qgRZ_iHdRkUX4QKzqteFddb8HFyKI-cd_93UdbMiBHWrVszhVL7_vzQpqs8vtvTPZ0-BFlxweDtQTH3wg9uvBgnkbFdyrasQK7fP-OQuRtdNBw49IubewtA4UvgSoI400Sbmf65NtJ-WWxb4V-bv2ELt-bsZw6pH5iT5Y_thrKTbn4QJGVn1U_hKGyg8QGMvsbFbcRTcPkA"
+              src="/images/ISOC.png"
               referrerPolicy="no-referrer"
             />
           </div>

@@ -14,8 +14,8 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('isDarkMode') === 'true');
+  const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(() => localStorage.getItem('isNotificationsEnabled') === 'true');
   const { schedule } = useSchedule(new Date());
 
   useEffect(() => {
@@ -24,11 +24,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     } else {
       document.documentElement.classList.remove('dark');
     }
+    localStorage.setItem('isDarkMode', isDarkMode.toString());
   }, [isDarkMode]);
 
   const handleNotificationToggle = async () => {
     const newState = !isNotificationsEnabled;
     setIsNotificationsEnabled(newState);
+    localStorage.setItem('isNotificationsEnabled', newState.toString());
 
     if (newState && 'Notification' in window) {
       try {

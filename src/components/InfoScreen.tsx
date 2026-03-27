@@ -48,6 +48,18 @@ export const InfoScreen: React.FC<InfoScreenProps> = ({ onLocationClick }) => {
               icon={<MapPin className="w-5 h-5" />}
               onClick={() => onLocationClick('manor-park')}
             />
+            <LocationItem 
+              title="University Hall (Jumu'ah)" 
+              desc="Main Hall for Friday Prayers" 
+              icon={<Users className="w-5 h-5" />}
+              onClick={() => onLocationClick('university-hall')}
+            />
+            <LocationItem 
+              title="Rubix (Jumu'ah)" 
+              desc="Large venue for Friday congregation" 
+              icon={<Navigation className="w-5 h-5" />}
+              onClick={() => onLocationClick('rubix')}
+            />
           </div>
         </div>
 

@@ -54,7 +54,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
             title: 'ISOC Prayer Room - Test',
             body: 'Native notifications are now active! This will work in the background.',
             id: 1,
-            schedule: { at: new Date(Date.now() + 1000) },
+            schedule: { at: new Date(Date.now() + 100) },
             sound: 'beep.wav',
             smallIcon: 'ic_stat_name'
           }

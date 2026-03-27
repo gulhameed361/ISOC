@@ -13,6 +13,9 @@ export const ScanScreen: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState<string | null>(null);
+  const [scanCount, setScanCount] = useState(() => Number(localStorage.getItem('successfulScans') || '0'));
+
+  const isLimitReached = scanCount >= 3;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -58,6 +61,10 @@ export const ScanScreen: React.FC = () => {
           uploadedAt: new Date().toISOString(),
           days: parsedData
         });
+
+        const newCount = scanCount + 1;
+        setScanCount(newCount);
+        localStorage.setItem('successfulScans', newCount.toString());
 
         setScanStatus("Success! Schedule updated for all users.");
         setTimeout(() => {
@@ -160,7 +167,10 @@ export const ScanScreen: React.FC = () => {
                 <span className="font-bold text-[10px] tracking-wide uppercase">Smart Parsing</span>
               </div>
               <p className="text-xs text-on-surface-variant leading-relaxed mb-6">
-                For best results, ensure the image is well-lit and the text is clearly legible.
+                {isLimitReached 
+                  ? "The calendar is up to date. No further uploads are needed at this time."
+                  : "For best results, ensure the image is well-lit and the text is clearly legible."
+                }
               </p>
               <ul className="space-y-3">
                 {[
@@ -176,11 +186,11 @@ export const ScanScreen: React.FC = () => {
               </ul>
             </div>
             <button 
-              disabled={!selectedFile || isScanning}
+              disabled={!selectedFile || isScanning || isLimitReached}
               onClick={handleScan}
               className={cn(
                 "w-full py-4 font-bold rounded-full flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 mt-4",
-                selectedFile && !isScanning ? "bg-primary text-on-primary hover:shadow-md" : "bg-surface-container-high text-on-surface-variant/40 cursor-not-allowed"
+                selectedFile && !isScanning && !isLimitReached ? "bg-primary text-on-primary hover:shadow-md" : "bg-surface-container-high text-on-surface-variant/40 cursor-not-allowed"
               )}
             >
               {isScanning ? (

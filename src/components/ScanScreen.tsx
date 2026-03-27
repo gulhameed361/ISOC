@@ -4,7 +4,7 @@ import { Sparkles, ScanLine, Camera, Image as ImageIcon, Loader2, Users } from '
 import { cn } from '../lib/utils';
 import { parseTimetableImage } from '../services/geminiService';
 import { db, auth } from '../firebase';
-import { doc, setDoc, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs, getDoc, query, orderBy, limit } from 'firebase/firestore';
 
 export const ScanScreen: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -30,11 +30,10 @@ export const ScanScreen: React.FC = () => {
         setHistory(docs);
 
         // Fetch Jumu'ah
-        const jDoc = await getDocs(query(collection(db, 'configs'), limit(1)));
-        const jData = jDoc.docs.find(d => d.id === 'jumuah')?.data();
-        if (jData) setJumuahLocation(jData.locationId);
+        const snap = await getDoc(doc(db, 'configs', 'jumuah'));
+        if (snap.exists()) setJumuahLocation(snap.data().locationId);
       } catch (error) {
-        console.error("Error fetching admin data:", error);
+        console.error("Error fetching data:", error);
       }
     };
     fetchData();

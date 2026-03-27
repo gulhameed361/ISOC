@@ -132,6 +132,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
             });
           }
           console.log(`Scheduled ${notificationsToSchedule.length} prayer notifications.`);
+          alert(`Professional Notifications: Successfully scheduled ${notificationsToSchedule.length} prayers for the week!`);
         } else {
           console.warn('No future prayers found to schedule.');
         }

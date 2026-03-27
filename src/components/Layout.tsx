@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { format } from 'date-fns';
+import { format, parse, addDays, isAfter } from 'date-fns';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { cn } from '../lib/utils';
 import { AppTab } from '../types';
@@ -69,61 +69,69 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   };
 
   useEffect(() => {
-    if (!isNotificationsEnabled) return;
+    const scheduleAllPrayers = async () => {
+      if (!isNotificationsEnabled || !schedule) return;
 
-    const parseIqamaCandidates = (value: string) => value.split('/').map((t) => t.trim());
+      try {
+        // 1. Clear existing notifications to avoid duplicates
+        const pending = await LocalNotifications.getPending();
+        if (pending.notifications.length > 0) {
+          await LocalNotifications.cancel({ notifications: pending.notifications });
+        }
 
-    const checkPrayers = () => {
-      const now = new Date();
-      const todayDateKey = format(now, 'yyyy-MM-dd');
-      const todaySchedule = schedule?.days.find((day) => day.dateStr === todayDateKey);
-      if (!todaySchedule) return;
-      const currentTimeStr = format(now, 'HH:mm');
+        const now = new Date();
+        const notificationsToSchedule = [];
 
-      todaySchedule.prayers.forEach(prayer => {
-        if (prayer.athan === currentTimeStr) {
-          const key = `notif_athan_${todayDateKey}_${prayer.name}_${currentTimeStr}`;
-          if (!localStorage.getItem(key)) {
-            console.log(`Sending native Athan notification for ${prayer.name}`);
-            LocalNotifications.schedule({
-              notifications: [
-                {
-                  title: `Time for ${prayer.name} Athan`,
-                  body: `The Athan for ${prayer.name} is at ${prayer.athan}.`,
-                  id: Math.floor(Math.random() * 1000000),
-                  schedule: { at: new Date(Date.now() + 500) }
+        // 2. Schedule for the next 7 days
+        for (let i = 0; i < 7; i++) {
+          const targetDate = addDays(now, i);
+          const dateKey = format(targetDate, 'yyyy-MM-dd');
+          const daySchedule = schedule.days.find(d => d.dateStr === dateKey);
+
+          if (daySchedule) {
+            daySchedule.prayers.forEach(prayer => {
+              // Helper to create future notification dates
+              const createNotification = (time: string, type: 'Athan' | 'Iqama') => {
+                const [hours, minutes] = time.split(':').map(Number);
+                const scheduleDate = new Date(targetDate);
+                scheduleDate.setHours(hours, minutes, 0, 0);
+
+                if (isAfter(scheduleDate, now)) {
+                  notificationsToSchedule.push({
+                    title: type === 'Athan' ? `Time for ${prayer.name} Athan` : `Iqama for ${prayer.name}`,
+                    body: type === 'Athan' ? `The Athan for ${prayer.name} is at ${time}.` : `The Iqama for ${prayer.name} is starting at ${time}.`,
+                    id: Math.floor(Math.random() * 10000000),
+                    schedule: { at: scheduleDate },
+                    sound: 'beep.wav'
+                  });
                 }
-              ]
+              };
+
+              createNotification(prayer.athan, 'Athan');
+              
+              // Handle optional iqama list (e.g. "13:30 / 14:00")
+              const iqamas = prayer.iqama.split('/').map(t => t.trim());
+              iqamas.forEach(t => createNotification(t, 'Iqama'));
             });
-            localStorage.setItem(key, 'true');
           }
         }
-        
-        parseIqamaCandidates(prayer.iqama).forEach((iqamaTime) => {
-          if (iqamaTime === currentTimeStr) {
-            const key = `notif_iqama_${todayDateKey}_${prayer.name}_${iqamaTime}`;
-            if (!localStorage.getItem(key)) {
-              console.log(`Sending native Iqama notification for ${prayer.name}`);
-              LocalNotifications.schedule({
-                notifications: [
-                  {
-                    title: `Iqama for ${prayer.name}`,
-                    body: `The Iqama for ${prayer.name} is starting at ${prayer.iqama}.`,
-                    id: Math.floor(Math.random() * 1000000),
-                    schedule: { at: new Date(Date.now() + 500) }
-                  }
-                ]
-              });
-              localStorage.setItem(key, 'true');
-            }
+
+        // 3. Send to native system
+        if (notificationsToSchedule.length > 0) {
+          // Send in batches of 50 (Capacitor/Android limit safety)
+          for (let i = 0; i < notificationsToSchedule.length; i += 50) {
+            await LocalNotifications.schedule({
+              notifications: notificationsToSchedule.slice(i, i + 50)
+            });
           }
-        });
-      });
+          console.log(`Scheduled ${notificationsToSchedule.length} prayer notifications.`);
+        }
+      } catch (error) {
+        console.error('Error in batch scheduling:', error);
+      }
     };
 
-    checkPrayers();
-    const interval = setInterval(checkPrayers, 30000); // Check every 30 seconds
-    return () => clearInterval(interval);
+    scheduleAllPrayers();
   }, [isNotificationsEnabled, schedule]);
 
   return (

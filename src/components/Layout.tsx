@@ -35,11 +35,28 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     if (newState && 'Notification' in window) {
       try {
         if (Notification.permission !== 'granted') {
-          await Notification.requestPermission();
+          const permission = await Notification.requestPermission();
+          console.log('Notification permission result:', permission);
         }
       } catch (error) {
         console.error('Error requesting notification permission:', error);
       }
+    }
+  };
+
+  const handleTestNotification = () => {
+    if (!('Notification' in window)) {
+      alert('Notifications are not supported by this device/browser.');
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      new Notification('ISOC Prayer Room - Test', {
+        body: 'This is a test notification. If you see this, your permissions are correct!',
+        icon: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC7x9onW-FLfHXV-NOvhon53sNsIcJjWJKDblaYYEiHQuEfiaWu-UkVZ5P7sXxCuL4qgRZ_iHdRkUX4QKzqteFddb8HFyKI-cd_93UdbMiBHWrVszhVL7_vzQpqs8vtvTPZ0-BFlxweDtQTH3wg9uvBgnkbFdyrasQK7fP-OQuRtdNBw49IubewtA4UvgSoI400Sbmf65NtJ-WWxb4V-bv2ELt-bsZw6pH5iT5Y_thrKTbn4QJGVn1U_hKGyg8QGMvsbFbcRTcPkA'
+      });
+    } else {
+      alert(`Notification permission is: ${Notification.permission}. Please turn on Notifications toggle first.`);
     }
   };
 
@@ -195,6 +212,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                       onClick={handleNotificationToggle}
                       trailing={<Toggle isOn={isNotificationsEnabled} />}
                     />
+                    {isNotificationsEnabled && (
+                      <SidebarItem 
+                        icon={<Star />} 
+                        label="Test Notification" 
+                        onClick={handleTestNotification}
+                        trailing={<div className="text-[10px] text-primary font-bold uppercase">Send Test</div>}
+                      />
+                    )}
                   </div>
 
                   {/* App Info */}

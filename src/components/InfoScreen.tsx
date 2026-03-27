@@ -74,7 +74,12 @@ export const InfoScreen: React.FC<InfoScreenProps> = ({ onLocationClick }) => {
             <a href="#" className="flex items-center gap-2 font-body text-tertiary font-semibold text-sm hover:underline">
               <Instagram className="w-4 h-4" /> @SurreyIslamicSociety
             </a>
-            <a href="#" className="flex items-center gap-2 font-body text-[#25D366] font-semibold text-sm hover:underline">
+            <a 
+              href="https://chat.whatsapp.com/F0bE4Gc60zm9WwoaNcot2q" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="flex items-center gap-2 font-body text-[#25D366] font-semibold text-sm hover:underline"
+            >
               <MessageCircle className="w-4 h-4" /> WhatsApp Group
             </a>
           </div>

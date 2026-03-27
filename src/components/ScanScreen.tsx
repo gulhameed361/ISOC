@@ -40,18 +40,18 @@ export const ScanScreen: React.FC = () => {
   }, [scanStatus]);
 
   const handleUpdateJumuah = async (locationId: string) => {
-    if (!auth.currentUser) return;
+    // For now, allow any user to set the location (Public)
+    setJumuahLocation(locationId); 
     setIsUpdatingJumuah(true);
     try {
       await setDoc(doc(db, 'configs', 'jumuah'), {
         locationId,
         updatedAt: new Date().toISOString(),
-        updatedBy: auth.currentUser.uid
+        updatedBy: auth.currentUser?.uid || 'anonymous'
       });
-      setJumuahLocation(locationId);
-      alert("Jumu'ah location updated for all users!");
     } catch (error) {
       console.error("Error updating Jumu'ah:", error);
+      alert("Error: Could not update location. Check your internet.");
     } finally {
       setIsUpdatingJumuah(false);
     }

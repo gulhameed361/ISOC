@@ -75,5 +75,10 @@ service cloud.firestore {
                        
       allow delete: if isAuthenticated() && isOwner(resource.data.uploadedBy);
     }
+
+    match /configs/{configId} {
+      // Allow public read/write for Jumu'ah configuration as requested
+      allow read, write: if true;
+    }
   }
 }

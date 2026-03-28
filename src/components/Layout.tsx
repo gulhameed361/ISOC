@@ -100,12 +100,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
               const createNotification = (time: string, type: 'Athan' | 'Iqama') => {
                 const [hours, minutes] = time.split(':').map(Number);
                 const scheduleDate = new Date(targetDate);
-                scheduleDate.setHours(hours, minutes, 0, 0);
+                // Set to 20 seconds BEFORE the scheduled time
+                scheduleDate.setHours(hours, minutes, -20, 0);
 
                 if (isAfter(scheduleDate, now)) {
+                  const displayName = (prayer.name === 'Dhuhr' && targetDate.getDay() === 5) ? 'Jumu\'ah' : prayer.name;
                   notificationsToSchedule.push({
-                    title: type === 'Athan' ? `Time for ${prayer.name} Athan` : `Iqama for ${prayer.name}`,
-                    body: type === 'Athan' ? `The Athan for ${prayer.name} is at ${time}.` : `The Iqama for ${prayer.name} is starting at ${time}.`,
+                    title: type === 'Athan' ? `${displayName} Athan soon` : `${displayName} Iqama soon`,
+                    body: type === 'Athan' 
+                      ? `The Athan for ${displayName} starts in 20 seconds (at ${time}).` 
+                      : `The Iqama for ${displayName} starts in 20 seconds (at ${time}).`,
                     id: Math.floor(Math.random() * 10000000),
                     schedule: { at: scheduleDate },
                     sound: 'beep.wav',

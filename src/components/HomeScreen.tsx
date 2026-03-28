@@ -243,7 +243,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
                 )}>
                   <PrayerIcon name={prayer.name} active={isCurrent} />
                 </div>
-                <span className="font-headline font-bold text-base">{prayer.name}</span>
+                <span className="font-headline font-bold text-base">{prayer.name === 'Dhuhr' && isFriday ? 'Jumu\'ah' : prayer.name}</span>
               </div>
               
               <div className="flex gap-10 items-center pr-2">
@@ -256,7 +256,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
       </section>
 
       {/* Jumu'ah Reminder (Friday only) */}
-      {isFriday && jumuahConfig && (
+      {isFriday && jumuahConfig && fridayDhuhr && (
         <section className="space-y-4">
           <div className="flex items-center gap-2 px-1">
             <Users className="w-5 h-5 text-tertiary" />
@@ -273,7 +273,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="font-headline font-bold text-lg text-on-surface">University Hall</h3>
-                      <p className="text-xs text-on-surface-variant font-medium">1st Khutbah: 1:15 PM</p>
+                      <p className="text-xs text-on-surface-variant font-medium">Khutbah: {fridayDhuhr.iqama.split('/')[0].trim()}</p>
                     </div>
                     <div className="bg-tertiary/20 px-3 py-1 rounded-full text-[10px] font-bold text-tertiary uppercase tracking-widest">
                       Confirmed Venue
@@ -296,7 +296,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onViewCalendar, selected
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <h3 className="font-headline font-bold text-lg text-on-surface">Rubix</h3>
-                      <p className="text-xs text-on-surface-variant font-medium">2nd Khutbah: 2:15 PM</p>
+                      <p className="text-xs text-on-surface-variant font-medium">Khutbah: {fridayDhuhr.iqama.split('/').length > 1 ? fridayDhuhr.iqama.split('/')[1].trim() : fridayDhuhr.iqama.trim()}</p>
                     </div>
                     <div className="bg-primary/20 px-3 py-1 rounded-full text-[10px] font-bold text-primary uppercase tracking-widest">
                       Confirmed Venue

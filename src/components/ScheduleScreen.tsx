@@ -69,7 +69,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ selectedMonth, o
                   <th className="p-2 border border-outline-variant/10" rowSpan={2}>Day</th>
                   <th className="p-2 border border-outline-variant/10 text-primary" colSpan={2}>Fajr</th>
                   <th className="p-2 border border-outline-variant/10 text-tertiary" rowSpan={2}>Sunrise</th>
-                  <th className="p-2 border border-outline-variant/10 text-primary" colSpan={2}>Dhuhr</th>
+                  <th className="p-2 border border-outline-variant/10 text-primary" colSpan={2}>Dhuhr / Jumu'ah</th>
                   <th className="p-2 border border-outline-variant/10 text-primary" colSpan={2}>Asr</th>
                   <th className="p-2 border border-outline-variant/10 text-primary" colSpan={2}>Maghrib</th>
                   <th className="p-2 border border-outline-variant/10 text-primary" colSpan={2}>Isha</th>
@@ -115,7 +115,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ selectedMonth, o
                       <td className="p-2 border border-outline-variant/10 bg-tertiary/5">{dayData.sunrise}</td>
                       <td className="p-2 border border-outline-variant/10">{dhuhr.athan}</td>
                       <td className={cn("p-2 border border-outline-variant/10", isFriday && "bg-primary/20 font-bold text-primary")}>
-                        {dhuhr.iqama}
+                        {isFriday ? dhuhr.iqama.split('/')[0].trim() : dhuhr.iqama}
                       </td>
                       <td className="p-2 border border-outline-variant/10">{asr.athan}</td>
                       <td className="p-2 border border-outline-variant/10">{asr.iqama}</td>

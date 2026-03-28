@@ -107,6 +107,34 @@ We welcome contributions from the community! Whether it's fixing bugs, adding fe
 -   **Testing**: Test your changes on both the web dev server and a mobile emulator/device if possible.
 -   **Notifications**: If you modify the notification logic (`src/components/Layout.tsx`), verify that they trigger at the correct relative offsets.
 
+## 📦 Releasing to GitHub
+
+To provide the app for download via GitHub Releases, follow these steps:
+
+### 1. Build the Release APK
+Run the following commands in your terminal:
+```bash
+# Build the web assets
+npm run build
+
+# Sync with Android project
+npx cap sync android
+
+# Open Android Studio to build the final APK
+npx cap open android
+```
+In **Android Studio**:
+- Go to **Build** > **Generate Signed Bundle / APK...**
+- Select **APK** and follow the prompts to create/use a keystore and sign your app.
+- Once finished, the `.apk` file will typically be located in `android/app/release/`.
+
+### 2. Create a GitHub Release
+1.  Navigate to your repository on GitHub.
+2.  On the right side, click **Releases** > **Create a new release** (or **Draft a new release**).
+3.  Choose a tag (e.g., `v1.0.0`) and a title.
+4.  **Drag and drop** your signed `.apk` file into the "Attach binaries..." area.
+5.  Click **Publish release**. People can now download the APK directly from your GitHub page!
+
 ## 📄 License
 
 Distributed under the MIT License.

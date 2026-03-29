@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 
 const geminiApiKey =
   import.meta.env.VITE_GEMINI_API_KEY ||
@@ -7,93 +7,107 @@ const geminiApiKey =
 
 const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
-export async function parseTimetableImage(base64Image: string, mimeType: string) {
+export interface Prayer {
+  name: string;
+  athan: string;
+  iqama: string;
+}
+
+export interface ParsedDay {
+  dateStr: string;
+  prayers: Prayer[];
+}
+
+export async function parseTimetableImage(base64Image: string, mimeType: string): Promise<ParsedDay[]> {
   if (!ai) {
-    throw new Error(
-      'Gemini API key is missing. Set VITE_GEMINI_API_KEY in your .env and rebuild.'
-    );
+    throw new Error('Gemini API key is missing. Set VITE_GEMINI_API_KEY in your .env and rebuild.');
   }
 
-  const prompt = `
-    Extract the prayer timetable from this image. This is likely a university or mosque prayer schedule.
-    
-    Look for a table with these typical columns:
-    - Date/Day
-    - Fajr (Athan & Iqama)
-    - Sunrise
-    - Dhuhr (Athan & Iqama) - on Fridays this is Jumu'ah
-    - Asr (Athan & Iqama)
-    - Maghrib (Athan & Iqama)
-    - Isha (Athan & Iqama)
-    
-    Extract all days visible in the image.
-    
-    Rules:
-    - If time shows "05:17 / 05:30": first is Athan, second is Iqama
-    - If single time like "05:30": assume it's the Iqama
-    - For merged cells, apply same time to all merged days
-    - Dates should be in YYYY-MM-DD format (use current year)
-    
-    Return a JSON array with this exact structure:
-    [
-      {
-        "dateStr": "2026-04-01",
-        "prayers": [
-          {"name": "Fajr", "athan": "05:17", "iqama": "05:30"},
-          {"name": "Sunrise", "athan": "06:47", "iqama": "06:47"},
-          {"name": "Dhuhr", "athan": "12:30", "iqama": "12:45"},
-          {"name": "Asr", "athan": "16:00", "iqama": "16:15"},
-          {"name": "Maghrib", "athan": "19:30", "iqama": "19:35"},
-          {"name": "Isha", "athan": "21:00", "iqama": "21:15"}
-        ]
-      }
+  const prompt = `You are extracting prayer times from an image of a prayer timetable.
+  
+Extract ALL days visible in the image. For each day, extract:
+
+1. The date in format "YYYY-MM-DD" (e.g., "2026-04-01")
+2. For each prayer (Fajr, Dhuhr, Asr, Maghrib, Isha):
+   - The Athan time
+   - The Iqama time
+
+IMPORTANT RULES:
+- If a cell shows "05:17 / 05:30" = first is Athan (05:17), second is Iqama (05:30)
+- If a cell shows only one time like "05:30" = this is likely the Iqama time, estimate Athan as 10-15 minutes before
+- For Sunrise, if shown, include it as a prayer with same time for athan and iqama
+- Return ONLY valid JSON array, no markdown, no explanation
+
+Return this exact JSON structure:
+[
+  {
+    "dateStr": "2026-04-01",
+    "prayers": [
+      {"name": "Fajr", "athan": "05:17", "iqama": "05:30"},
+      {"name": "Dhuhr", "athan": "12:30", "iqama": "12:45"},
+      {"name": "Asr", "athan": "16:00", "iqama": "16:15"},
+      {"name": "Maghrib", "athan": "19:30", "iqama": "19:35"},
+      {"name": "Isha", "athan": "21:00", "iqama": "21:15"}
     ]
-    
-    Only include times you can clearly read. Skip rows where times are unreadable.
-  `;
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [
-      { text: prompt },
-      { inlineData: { data: base64Image, mimeType: mimeType } },
-    ],
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            dateStr: { type: Type.STRING },
-            hijriDate: { type: Type.STRING },
-            sunrise: { type: Type.STRING },
-            prayers: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  athan: { type: Type.STRING },
-                  iqama: { type: Type.STRING }
-                },
-                required: ["name", "athan", "iqama"]
-              }
-            }
-          },
-          required: ["dateStr", "prayers"]
-        }
-      }
-    }
-  });
-
-  if (!response.text) {
-    throw new Error("Failed to parse image");
   }
+]`;
 
   try {
-    return JSON.parse(response.text);
-  } catch {
-    throw new Error("Failed to parse AI response");
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        { text: prompt },
+        { inlineData: { data: base64Image, mimeType: mimeType } },
+      ],
+    });
+
+    const text = response.text?.trim() || '';
+    
+    // Remove markdown code blocks if present
+    let jsonStr = text;
+    if (text.startsWith('```json')) {
+      jsonStr = text.slice(7);
+    } else if (text.startsWith('```')) {
+      jsonStr = text.slice(3);
+    }
+    if (jsonStr.endsWith('```')) {
+      jsonStr = jsonStr.slice(0, -3);
+    }
+    jsonStr = jsonStr.trim();
+
+    console.log('Raw AI response:', jsonStr.substring(0, 500));
+
+    const parsed = JSON.parse(jsonStr);
+    
+    // Validate structure
+    if (!Array.isArray(parsed)) {
+      throw new Error('Invalid response format');
+    }
+
+    // Normalize the data
+    return parsed.map((day: any) => {
+      const prayers: Prayer[] = [];
+      
+      if (Array.isArray(day.prayers)) {
+        day.prayers.forEach((p: any) => {
+          if (p.name && p.athan) {
+            prayers.push({
+              name: p.name,
+              athan: p.athan,
+              iqama: p.iqama || p.athan, // fallback
+            });
+          }
+        });
+      }
+      
+      return {
+        dateStr: day.dateStr || '',
+        prayers,
+      };
+    }).filter((day: ParsedDay) => day.prayers.length > 0);
+
+  } catch (error) {
+    console.error('Gemini parse error:', error);
+    throw new Error(`Failed to parse image: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

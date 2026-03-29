@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { format, parse, addDays, isAfter } from 'date-fns';
-import { LocalNotifications } from '@capacitor/local-notifications';
 import { cn } from '../lib/utils';
 import { AppTab } from '../types';
-import { Home, Calendar, Scan, Info, Menu, X, Settings, Bell, Moon, Star, ExternalLink } from 'lucide-react';
-import { useSchedule } from '../hooks/useSchedule';
+import { Home, Calendar, Scan, Info, Menu, X, Bell, Moon, Star, ExternalLink } from 'lucide-react';
+import { onFCMMessage } from '../firebase';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,8 +14,7 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('isDarkMode') === 'true');
-  const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(() => localStorage.getItem('isNotificationsEnabled') === 'true');
-  const { schedule } = useSchedule(new Date());
+  const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(() => localStorage.getItem('isNotificationsEnabled') !== 'false');
 
   useEffect(() => {
     if (isDarkMode) {
@@ -28,128 +25,23 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     localStorage.setItem('isDarkMode', isDarkMode.toString());
   }, [isDarkMode]);
 
-  const handleNotificationToggle = async () => {
-    const newState = !isNotificationsEnabled;
-    setIsNotificationsEnabled(newState);
-    localStorage.setItem('isNotificationsEnabled', newState.toString());
-
-    if (newState) {
-      try {
-        const status = await LocalNotifications.checkPermissions();
-        if (status.display !== 'granted') {
-          const request = await LocalNotifications.requestPermissions();
-          console.log('Notification permission request:', request.display);
-        }
-      } catch (error) {
-        console.error('Error requesting native notification permission:', error);
-      }
-    }
-  };
-
-  const handleTestNotification = async () => {
-    try {
-      await LocalNotifications.schedule({
-        notifications: [
-          {
-            title: 'ISOC Prayer Room - Test',
-            body: 'Native notifications are now active! This will work in the background.',
-            id: 1,
-            sound: 'beep.wav',
-            smallIcon: 'ic_stat_name'
-          }
-        ]
-      });
-    } catch (error) {
-      console.error('Error sending test notification:', error);
-      alert('Failed to send native notification. Check permissions in Android settings.');
-    }
-  };
+  useEffect(() => {
+    localStorage.setItem('isNotificationsEnabled', isNotificationsEnabled.toString());
+  }, [isNotificationsEnabled]);
 
   useEffect(() => {
-    const scheduleAllPrayers = async () => {
-      if (!isNotificationsEnabled || !schedule) return;
+    onFCMMessage((payload) => {
+      console.log('FCM message received:', payload);
+    });
+  }, []);
 
-      try {
-        // 1. Clear existing notifications to avoid duplicates
-        const pending = await LocalNotifications.getPending();
-        if (pending.notifications.length > 0) {
-          await LocalNotifications.cancel({ notifications: pending.notifications });
-        }
-
-        const now = new Date();
-        const notificationsToSchedule = [];
-
-        // 2. Schedule for the next 7 days
-        for (let i = 0; i < 7; i++) {
-          const targetDate = addDays(now, i);
-          const dateKey = format(targetDate, 'yyyy-MM-dd');
-          
-          // More robust matching: Parse the date from Firestore and compare formatted strings
-          const daySchedule = schedule.days.find(d => {
-            try {
-              const dDate = new Date(d.dateStr);
-              return format(dDate, 'yyyy-MM-dd') === dateKey;
-            } catch {
-              return d.dateStr === dateKey;
-            }
-          });
-
-          if (daySchedule) {
-            daySchedule.prayers.forEach(prayer => {
-              // Helper to create future notification dates
-              const createNotification = (time: string, type: 'Athan' | 'Iqama') => {
-                const [hours, minutes] = time.split(':').map(Number);
-                const scheduleDate = new Date(targetDate);
-                // Set to 20 seconds BEFORE the scheduled time
-                scheduleDate.setHours(hours, minutes, -20, 0);
-
-                if (isAfter(scheduleDate, now)) {
-                  const displayName = (prayer.name === 'Dhuhr' && targetDate.getDay() === 5) ? 'Jumu\'ah' : prayer.name;
-                  notificationsToSchedule.push({
-                    title: type === 'Athan' ? `${displayName} Athan soon` : `${displayName} Iqama soon`,
-                    body: type === 'Athan' 
-                      ? `The Athan for ${displayName} starts in 20 seconds (at ${time}).` 
-                      : `The Iqama for ${displayName} starts in 20 seconds (at ${time}).`,
-                    id: Math.floor(Math.random() * 10000000),
-                    schedule: { at: scheduleDate },
-                    sound: 'beep.wav',
-                    smallIcon: 'ic_stat_name'
-                  });
-                }
-              };
-
-              createNotification(prayer.athan, 'Athan');
-              
-              // Handle optional iqama list (e.g. "13:30 / 14:00")
-              const iqamas = prayer.iqama.split('/').map(t => t.trim());
-              iqamas.forEach(t => createNotification(t, 'Iqama'));
-            });
-          }
-        }
-
-        // 3. Send to native system
-        if (notificationsToSchedule.length > 0) {
-          for (let i = 0; i < notificationsToSchedule.length; i += 50) {
-            await LocalNotifications.schedule({
-              notifications: notificationsToSchedule.slice(i, i + 50)
-            });
-          }
-          console.log(`Scheduled ${notificationsToSchedule.length} prayer notifications.`);
-          alert(`Professional Notifications: Successfully scheduled ${notificationsToSchedule.length} prayers for the week!`);
-        } else {
-          console.warn('No future prayers found to schedule.');
-        }
-      } catch (error) {
-        console.error('Error in batch scheduling:', error);
-      }
-    };
-
-    scheduleAllPrayers();
-  }, [isNotificationsEnabled, schedule]);
+  const handleNotificationToggle = () => {
+    const newState = !isNotificationsEnabled;
+    setIsNotificationsEnabled(newState);
+  };
 
   return (
     <div className="min-h-screen pb-24">
-      {/* Top App Bar */}
       <header className="fixed top-0 w-full z-50 glass-effect border-b border-outline-variant/10">
         <div className="flex items-center justify-between px-6 h-16 max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
@@ -167,12 +59,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="pt-20 px-6 max-w-2xl mx-auto">
         {children}
       </main>
 
-      {/* Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-safe pt-2 h-20 glass-effect z-50 rounded-t-2xl shadow-[0_-4px_24px_rgba(27,28,26,0.06)]">
         <NavItem 
           icon={<Home className="w-6 h-6" />} 
@@ -200,11 +90,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         />
       </nav>
 
-      {/* Sidebar Drawer */}
       <AnimatePresence>
         {isSidebarOpen && (
           <>
-            {/* Overlay */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -213,7 +101,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
               className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm"
             />
             
-            {/* Sidebar */}
             <motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
@@ -230,7 +117,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 </div>
 
                 <div className="space-y-6">
-                  {/* Preferences */}
                   <div className="space-y-3">
                     <h3 className="font-headline font-semibold text-xs text-on-surface-variant uppercase tracking-wider">Preferences</h3>
                     <SidebarItem 
@@ -245,17 +131,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                       onClick={handleNotificationToggle}
                       trailing={<Toggle isOn={isNotificationsEnabled} />}
                     />
-                    {isNotificationsEnabled && (
-                      <SidebarItem 
-                        icon={<Star />} 
-                        label="Test Notification" 
-                        onClick={handleTestNotification}
-                        trailing={<div className="text-[10px] text-primary font-bold uppercase">Send Test</div>}
-                      />
-                    )}
                   </div>
 
-                  {/* App Info */}
                   <div className="space-y-3">
                     <h3 className="font-headline font-semibold text-xs text-on-surface-variant uppercase tracking-wider">About</h3>
                     <a 

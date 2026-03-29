@@ -82,9 +82,9 @@ export const ScanScreen: React.FC = () => {
       console.log('Starting scan process...');
       console.log('File:', selectedFile.name, selectedFile.type, selectedFile.size);
 
-      // Convert file to base64
-      const reader = new FileReader();
+      // Convert file to base64 - IMPORTANT: set up event handler BEFORE calling readAsDataURL
       const base64Image = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
         reader.onload = () => {
           const result = reader.result as string;
           console.log('File read complete, length:', result.length);
@@ -94,8 +94,9 @@ export const ScanScreen: React.FC = () => {
           console.error('FileReader error');
           reject(new Error('Failed to read file'));
         };
+        // Start reading AFTER setting up handlers
+        reader.readAsDataURL(selectedFile);
       });
-      reader.readAsDataURL(selectedFile);
 
       setScanStatus("Sending to AI...");
       console.log('Calling Gemini API...');

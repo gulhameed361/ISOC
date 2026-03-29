@@ -53,6 +53,9 @@ Return this exact JSON structure:
 ]`;
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [
@@ -60,6 +63,8 @@ Return this exact JSON structure:
         { inlineData: { data: base64Image, mimeType: mimeType } },
       ],
     });
+
+    clearTimeout(timeoutId);
 
     const text = response.text?.trim() || '';
     

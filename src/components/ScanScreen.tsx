@@ -70,30 +70,52 @@ export const ScanScreen: React.FC = () => {
   const triggerCamera = () => cameraInputRef.current?.click();
 
   const handleScan = async () => {
-    if (!selectedFile || !auth.currentUser) return;
+    if (!selectedFile || !auth.currentUser) {
+      setScanStatus("Please select an image first");
+      return;
+    }
 
     setIsScanning(true);
-    setScanStatus("Analyzing image with AI...");
+    setScanStatus("Reading image...");
 
     try {
+      console.log('Starting scan process...');
+      console.log('File:', selectedFile.name, selectedFile.type, selectedFile.size);
+
       // Convert file to base64
       const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
+      const base64Image = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          console.log('File read complete, length:', result.length);
+          resolve(result.split(',')[1]);
+        };
+        reader.onerror = () => {
+          console.error('FileReader error');
+          reject(new Error('Failed to read file'));
+        };
       });
       reader.readAsDataURL(selectedFile);
-      const base64Image = await base64Promise;
 
-      setScanStatus("Extracting prayer times...");
+      setScanStatus("Sending to AI...");
+      console.log('Calling Gemini API...');
+      
       const parsedData = await parseTimetableImage(base64Image, selectedFile.type);
+      
+      console.log('API response received:', JSON.stringify(parsedData)?.substring(0, 200));
 
       if (parsedData && parsedData.length > 0) {
         setScanStatus("Saving to database...");
-        // Assuming all dates are in the same month, get the month from the first date
+        
         const firstDate = new Date(parsedData[0].dateStr);
+        if (isNaN(firstDate.getTime())) {
+          throw new Error("Invalid date from AI: " + parsedData[0].dateStr);
+        }
+        
         const monthId = `${firstDate.getFullYear()}-${String(firstDate.getMonth() + 1).padStart(2, '0')}`;
         const monthName = firstDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+        console.log('Saving to:', monthId);
 
         await setDoc(doc(db, 'schedules', monthId), {
           month: monthName,
@@ -113,12 +135,11 @@ export const ScanScreen: React.FC = () => {
           setScanStatus(null);
         }, 3000);
       } else {
-        throw new Error("No data extracted");
+        throw new Error("No data extracted from image");
       }
     } catch (error) {
       console.error("Scan error:", error);
-      const message =
-        error instanceof Error ? error.message : "Failed to parse image. Please try again.";
+      const message = error instanceof Error ? error.message : "Failed to parse image. Please try again.";
       setScanStatus(message);
     } finally {
       setIsScanning(false);

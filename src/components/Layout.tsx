@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { AppTab } from '../types';
 import { Home, Calendar, Scan, Info, Menu, X, Bell, Moon, Star, ExternalLink } from 'lucide-react';
-import { onFCMMessage } from '../firebase';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -28,12 +27,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   useEffect(() => {
     localStorage.setItem('isNotificationsEnabled', isNotificationsEnabled.toString());
   }, [isNotificationsEnabled]);
-
-  useEffect(() => {
-    onFCMMessage((payload) => {
-      console.log('FCM message received:', payload);
-    });
-  }, []);
 
   const handleNotificationToggle = () => {
     const newState = !isNotificationsEnabled;

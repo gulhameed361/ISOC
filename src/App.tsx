@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, signInWithCredential, GoogleAuthProvider, User } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, googleProvider, requestFcmToken } from './firebase';
+import { auth, googleProvider } from './firebase';
 import { Layout } from './components/Layout';
 import { HomeScreen } from './components/HomeScreen';
 import { ScheduleScreen } from './components/ScheduleScreen';
@@ -11,9 +10,8 @@ import { ScanScreen } from './components/ScanScreen';
 import { InfoScreen } from './components/InfoScreen';
 import { LocationDetailScreen } from './components/LocationDetailScreen';
 import { AppTab } from './types';
-import { db } from './firebase';
 
-const DEFAULT_START_MONTH = 2; // March
+const DEFAULT_START_MONTH = 2;
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -25,32 +23,10 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedMonth, setSelectedMonth] = useState<number>(Math.max(new Date().getMonth(), DEFAULT_START_MONTH));
 
-  const registerFcmToken = async (user: User | null) => {
-    if (!user) return;
-    
-    try {
-      const token = await requestFcmToken();
-      if (token) {
-        await setDoc(doc(db, 'users', user.uid), {
-          fcmToken: token,
-          lastLogin: serverTimestamp(),
-          email: user.email,
-        }, { merge: true });
-        console.log('FCM token registered');
-      }
-    } catch (error) {
-      console.warn('Failed to register FCM token:', error);
-    }
-  };
-
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsAuthReady(true);
-      
-      if (currentUser) {
-        await registerFcmToken(currentUser);
-      }
     });
     return () => unsubscribe();
   }, []);
@@ -76,17 +52,11 @@ export default function App() {
 
         const credential = GoogleAuthProvider.credential(idToken ?? undefined, accessToken ?? undefined);
         await signInWithCredential(auth, credential);
-        
-        await registerFcmToken(auth.currentUser);
-        
         setIsLoggingIn(false);
         return;
       }
 
       await signInWithPopup(auth, googleProvider);
-      
-      await registerFcmToken(auth.currentUser);
-      
       setIsLoggingIn(false);
     } catch (error) {
       const firebaseError = error as { code?: string; message?: string };
@@ -178,7 +148,7 @@ export default function App() {
 
   const handleTabChange = (tab: AppTab) => {
     setActiveTab(tab);
-    setSelectedLocationId(null); // Reset detail view when changing tabs
+    setSelectedLocationId(null);
   };
 
   return (

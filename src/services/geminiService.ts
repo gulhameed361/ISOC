@@ -15,6 +15,8 @@ export interface Prayer {
 
 export interface ParsedDay {
   dateStr: string;
+  hijriDate?: string;
+  sunrise?: string;
   prayers: Prayer[];
 }
 
@@ -28,20 +30,23 @@ export async function parseTimetableImage(base64Image: string, mimeType: string)
 Extract ALL days visible in the image. For each day, extract:
 
 1. The date in format "YYYY-MM-DD" (e.g., "2026-04-01")
-2. For each prayer (Fajr, Dhuhr, Asr, Maghrib, Isha):
+2. The Sunrise time
+3. The Hijri date if visible
+4. For each prayer (Fajr, Dhuhr, Asr, Maghrib, Isha):
    - The Athan time
    - The Iqama time
 
 IMPORTANT RULES:
 - If a cell shows "05:17 / 05:30" = first is Athan (05:17), second is Iqama (05:30)
 - If a cell shows only one time like "05:30" = this is likely the Iqama time, estimate Athan as 10-15 minutes before
-- For Sunrise, if shown, include it as a prayer with same time for athan and iqama
 - Return ONLY valid JSON array, no markdown, no explanation
 
 Return this exact JSON structure:
 [
   {
     "dateStr": "2026-04-01",
+    "hijriDate": "12 Ramadan 1447",
+    "sunrise": "06:47",
     "prayers": [
       {"name": "Fajr", "athan": "05:17", "iqama": "05:30"},
       {"name": "Dhuhr", "athan": "12:30", "iqama": "12:45"},
@@ -95,7 +100,7 @@ Return this exact JSON structure:
       
       if (Array.isArray(day.prayers)) {
         day.prayers.forEach((p: any) => {
-          if (p.name && p.athan) {
+          if (p.name && p.athan && p.name !== 'Sunrise') {
             prayers.push({
               name: p.name,
               athan: p.athan,
@@ -107,6 +112,8 @@ Return this exact JSON structure:
       
       return {
         dateStr: day.dateStr || '',
+        hijriDate: day.hijriDate || '',
+        sunrise: day.sunrise || (Array.isArray(day.prayers) ? day.prayers.find((p:any) => p.name === 'Sunrise')?.athan : '') || '',
         prayers,
       };
     }).filter((day: ParsedDay) => day.prayers.length > 0);

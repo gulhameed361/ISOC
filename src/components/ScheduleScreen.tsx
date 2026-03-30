@@ -115,7 +115,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ selectedMonth, o
                       <td className="p-2 border border-outline-variant/10 bg-tertiary/5">{dayData.sunrise}</td>
                       <td className="p-2 border border-outline-variant/10">{dhuhr.athan}</td>
                       <td className={cn("p-2 border border-outline-variant/10", isFriday && "bg-primary/20 font-bold text-primary")}>
-                        {isFriday ? dhuhr.iqama.split('/')[0].trim() : dhuhr.iqama}
+                        {isFriday ? (dhuhr.iqama || '').split('/')[0]?.trim() || '-' : dhuhr.iqama}
                       </td>
                       <td className="p-2 border border-outline-variant/10">{asr.athan}</td>
                       <td className="p-2 border border-outline-variant/10">{asr.iqama}</td>

@@ -3,9 +3,8 @@ import { motion } from 'motion/react';
 import { Sparkles, ScanLine, Camera, Image as ImageIcon, Loader2, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { parseTimetableImage } from '../services/geminiService';
-import { db, auth, storage } from '../firebase';
+import { db, auth } from '../firebase';
 import { doc, setDoc, collection, getDocs, getDoc, query, orderBy, limit } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 export const ScanScreen: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -83,26 +82,54 @@ export const ScanScreen: React.FC = () => {
       console.log('Starting scan process...');
       console.log('File:', selectedFile.name, selectedFile.type, selectedFile.size);
 
-      // Convert file to base64 - IMPORTANT: set up event handler BEFORE calling readAsDataURL
-      const base64Image = await new Promise<string>((resolve, reject) => {
+      // Compress file to base64 using Canvas to fit under Firestore 1MB limit
+      const compressedDataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          console.log('File read complete, length:', result.length);
-          resolve(result.split(',')[1]);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1600;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+              }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = '#FFFFFF'; // White background for transparent PNGs
+              ctx.fillRect(0, 0, width, height);
+              ctx.drawImage(img, 0, 0, width, height);
+            }
+            
+            resolve(canvas.toDataURL('image/jpeg', 0.6)); // 0.6 quality for aggressive compression
+          };
+          img.onerror = () => reject(new Error('Failed to load image for compression'));
+          img.src = event.target?.result as string;
         };
-        reader.onerror = () => {
-          console.error('FileReader error');
-          reject(new Error('Failed to read file'));
-        };
-        // Start reading AFTER setting up handlers
+        reader.onerror = () => reject(new Error('Failed to read file'));
         reader.readAsDataURL(selectedFile);
       });
+
+      const base64ImageForAI = compressedDataUrl.split(',')[1];
 
       setScanStatus("Sending to AI...");
       console.log('Calling Gemini API...');
       
-      const parsedData = await parseTimetableImage(base64Image, selectedFile.type);
+      const parsedData = await parseTimetableImage(base64ImageForAI, 'image/jpeg');
       
       console.log('API response received:', JSON.stringify(parsedData)?.substring(0, 200));
 
@@ -117,18 +144,13 @@ export const ScanScreen: React.FC = () => {
         const monthId = `${firstDate.getFullYear()}-${String(firstDate.getMonth() + 1).padStart(2, '0')}`;
         const monthName = firstDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-        setScanStatus("Uploading image to storage...");
-        const storageRef = ref(storage, `schedules/${monthId}`);
-        await uploadString(storageRef, base64Image, 'base64', { contentType: selectedFile.type });
-        const imageUrl = await getDownloadURL(storageRef);
-
         console.log('Saving to:', monthId);
 
         await setDoc(doc(db, 'schedules', monthId), {
           month: monthName,
           uploadedBy: auth.currentUser.uid,
           uploadedAt: new Date().toISOString(),
-          imageUrl: imageUrl,
+          imageUrl: compressedDataUrl,
           days: parsedData
         });
 

@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { AppTab } from '../types';
 import { Home, Calendar, Scan, Info, Menu, X, Bell, Moon, Star, ExternalLink } from 'lucide-react';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { useSchedule } from '../hooks/useSchedule';
+import { addDays, format, isAfter } from 'date-fns';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,6 +17,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('isDarkMode') === 'true');
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(() => localStorage.getItem('isNotificationsEnabled') !== 'false');
+  const { schedule } = useSchedule(new Date());
 
   useEffect(() => {
     if (isDarkMode) {
@@ -28,10 +32,93 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     localStorage.setItem('isNotificationsEnabled', isNotificationsEnabled.toString());
   }, [isNotificationsEnabled]);
 
-  const handleNotificationToggle = () => {
+  const handleNotificationToggle = async () => {
     const newState = !isNotificationsEnabled;
     setIsNotificationsEnabled(newState);
+    if (newState) {
+      try {
+        const status = await LocalNotifications.checkPermissions();
+        if (status.display !== 'granted') {
+          await LocalNotifications.requestPermissions();
+        }
+      } catch (error) {
+        console.error('Error requesting notification permission:', error);
+      }
+    }
   };
+
+  useEffect(() => {
+    const scheduleAllPrayers = async () => {
+      if (!isNotificationsEnabled || !schedule) {
+        try { await LocalNotifications.cancel({ notifications: (await LocalNotifications.getPending()).notifications }); } catch (e) {}
+        return;
+      }
+
+      try {
+        const pending = await LocalNotifications.getPending();
+        if (pending.notifications.length > 0) {
+          await LocalNotifications.cancel({ notifications: pending.notifications });
+        }
+
+        const now = new Date();
+        const notificationsToSchedule = [];
+
+        // Schedule for the next 7 days safely
+        for (let i = 0; i < 7; i++) {
+          const targetDate = addDays(now, i);
+          const dateKey = format(targetDate, 'yyyy-MM-dd');
+          
+          const daySchedule = schedule.days.find(d => d.dateStr.startsWith(dateKey));
+
+          if (daySchedule) {
+            daySchedule.prayers.forEach(prayer => {
+              const createNotification = (time: string, type: 'Athan' | 'Iqama') => {
+                if (!time || time === '-') return;
+                const [hours, minutes] = time.split(':').map(Number);
+                if (isNaN(hours) || isNaN(minutes)) return;
+
+                const scheduleDate = new Date(targetDate);
+                // Fire exactly 20 seconds before the prayer time
+                scheduleDate.setHours(hours, minutes, -20, 0);
+
+                if (isAfter(scheduleDate, now)) {
+                  const displayName = (prayer.name === 'Dhuhr' && targetDate.getDay() === 5) ? 'Jumu\'ah' : prayer.name;
+                  notificationsToSchedule.push({
+                    title: type === 'Athan' ? `${displayName} Athan` : `${displayName} Iqama`,
+                    body: `The ${type} for ${displayName} is at ${time}.`,
+                    id: Math.floor(Math.random() * 1000000) + scheduleDate.getTime() % 10000,
+                    schedule: { at: scheduleDate },
+                    sound: 'beep.wav',
+                    smallIcon: 'ic_stat_name'
+                  });
+                }
+              };
+
+              createNotification(prayer.athan, 'Athan');
+              
+              if (prayer.iqama) {
+                const iqamas = prayer.iqama.split('/').map(t => t.trim());
+                iqamas.forEach(t => createNotification(t, 'Iqama'));
+              }
+            });
+          }
+        }
+
+        if (notificationsToSchedule.length > 0) {
+          for (let i = 0; i < notificationsToSchedule.length; i += 50) {
+            await LocalNotifications.schedule({
+              notifications: notificationsToSchedule.slice(i, i + 50)
+            });
+          }
+          console.log(`Scheduled ${notificationsToSchedule.length} prayer notifications.`);
+        }
+      } catch (error) {
+        console.error('Error in batch scheduling notifications:', error);
+      }
+    };
+
+    scheduleAllPrayers();
+  }, [isNotificationsEnabled, schedule]);
 
   return (
     <div className="min-h-screen pb-24">

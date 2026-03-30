@@ -1,10 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { Sparkles, ScanLine, Camera, Image as ImageIcon, Loader2, Users } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Sparkles, ScanLine, Camera, Image as ImageIcon, Loader2, Users, Trash2, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { parseTimetableImage } from '../services/geminiService';
 import { db, auth } from '../firebase';
-import { doc, setDoc, collection, getDocs, getDoc, query, orderBy, limit } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs, getDoc, query, orderBy, limit, deleteDoc } from 'firebase/firestore';
 
 export const ScanScreen: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -17,6 +17,7 @@ export const ScanScreen: React.FC = () => {
   const [history, setHistory] = useState<any[]>([]);
   const [jumuahLocation, setJumuahLocation] = useState('university-hall');
   const [isUpdatingJumuah, setIsUpdatingJumuah] = useState(false);
+  const [viewHistoryUrl, setViewHistoryUrl] = useState<string | null>(null);
 
   const isLimitReached = scanCount >= 3;
 
@@ -54,6 +55,18 @@ export const ScanScreen: React.FC = () => {
       alert("Error: Could not update location. Check your internet.");
     } finally {
       setIsUpdatingJumuah(false);
+    }
+  };
+
+  const handleDeleteHistory = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to absolutely delete this scheduled month?")) return;
+    try {
+      await deleteDoc(doc(db, 'schedules', id));
+      setHistory(prev => prev.filter(item => item.id !== id));
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete schedule from database.");
     }
   };
 
@@ -347,8 +360,26 @@ export const ScanScreen: React.FC = () => {
                     Updated {new Date(item.uploadedAt).toLocaleDateString()}
                   </p>
                 </div>
-                <div className="bg-primary/10 px-2 py-1 rounded text-[9px] font-bold text-primary uppercase">
-                  Active
+                <div className="flex items-center gap-1">
+                  {item.imageUrl && (
+                    <button 
+                      onClick={() => setViewHistoryUrl(item.imageUrl)}
+                      className="p-2 hover:bg-secondary-container rounded-full text-secondary transition-colors"
+                      title="View Image"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button 
+                    onClick={(e) => handleDeleteHistory(item.id, e)}
+                    className="p-2 hover:bg-error/10 rounded-full text-error transition-colors"
+                    title="Delete Schedule"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  <div className="bg-primary/10 px-2 py-1 rounded text-[9px] font-bold text-primary uppercase ml-1">
+                    Active
+                  </div>
                 </div>
               </div>
             ))
@@ -359,6 +390,34 @@ export const ScanScreen: React.FC = () => {
           )}
         </div>
       </section>
+
+      {/* History Image Modal */}
+      <AnimatePresence>
+        {viewHistoryUrl && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm"
+          >
+            <div className="w-full max-w-2xl flex justify-end mb-4">
+              <button 
+                onClick={() => setViewHistoryUrl(null)}
+                className="p-3 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="relative w-full max-w-2xl max-h-[80vh] overflow-hidden rounded-2xl flex items-center justify-center">
+              <img 
+                src={viewHistoryUrl} 
+                alt="History Timetable" 
+                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

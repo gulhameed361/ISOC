@@ -3,7 +3,8 @@ import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
 import { useSchedule } from '../hooks/useSchedule';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ImageIcon, X } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
 
 interface ScheduleScreenProps {
   selectedMonth: number;
@@ -23,6 +24,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ selectedMonth, o
   const currentMonthName = MONTHS.find(m => m.id === selectedMonth)?.name || 'MARCH';
   const daysInMonth = new Date(currentYear, selectedMonth + 1, 0).getDate();
   const { schedule, loading } = useSchedule(new Date(currentYear, selectedMonth, 1));
+  const [showImageModal, setShowImageModal] = React.useState(false);
 
   return (
     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
@@ -33,6 +35,15 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ selectedMonth, o
           <p>Islamic Prayer Centre, AA Building, University of Surrey, GU2 7XH</p>
           <p>Manor Park Prayer Room, JB01-10, James Black Road, GU2 7YW</p>
         </div>
+        {schedule?.imageUrl && (
+          <button 
+            onClick={() => setShowImageModal(true)}
+            className="mt-4 mx-auto flex items-center gap-2 px-4 py-2 bg-secondary-container text-on-secondary-container rounded-full text-xs font-bold hover:opacity-90 transition-opacity active:scale-95 shadow-sm"
+          >
+            <ImageIcon className="w-4 h-4" />
+            View Original Timetable
+          </button>
+        )}
       </section>
 
       {/* Month Selector */}
@@ -154,6 +165,34 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ selectedMonth, o
           </div>
         </div>
       </footer>
+
+      {/* Image Modal */}
+      <AnimatePresence>
+        {showImageModal && schedule?.imageUrl && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm"
+          >
+            <div className="w-full max-w-2xl flex justify-end mb-4">
+              <button 
+                onClick={() => setShowImageModal(false)}
+                className="p-3 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="relative w-full max-w-2xl max-h-[80vh] overflow-hidden rounded-2xl flex items-center justify-center">
+              <img 
+                src={schedule.imageUrl} 
+                alt="Original Timetable" 
+                className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -3,8 +3,9 @@ import { motion } from 'motion/react';
 import { Sparkles, ScanLine, Camera, Image as ImageIcon, Loader2, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { parseTimetableImage } from '../services/geminiService';
-import { db, auth } from '../firebase';
+import { db, auth, storage } from '../firebase';
 import { doc, setDoc, collection, getDocs, getDoc, query, orderBy, limit } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 export const ScanScreen: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -116,12 +117,18 @@ export const ScanScreen: React.FC = () => {
         const monthId = `${firstDate.getFullYear()}-${String(firstDate.getMonth() + 1).padStart(2, '0')}`;
         const monthName = firstDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
+        setScanStatus("Uploading image to storage...");
+        const storageRef = ref(storage, `schedules/${monthId}`);
+        await uploadString(storageRef, base64Image, 'base64', { contentType: selectedFile.type });
+        const imageUrl = await getDownloadURL(storageRef);
+
         console.log('Saving to:', monthId);
 
         await setDoc(doc(db, 'schedules', monthId), {
           month: monthName,
           uploadedBy: auth.currentUser.uid,
           uploadedAt: new Date().toISOString(),
+          imageUrl: imageUrl,
           days: parsedData
         });
 

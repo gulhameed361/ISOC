@@ -19,6 +19,7 @@ export interface MonthlySchedule {
   month: string;
   uploadedBy: string;
   uploadedAt: string;
+  imageUrl?: string;
   days: DaySchedule[];
 }
 

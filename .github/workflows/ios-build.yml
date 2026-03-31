@@ -1,7 +1,7 @@
 name: Build iOS App
 on:
   push:
-    branches: [ main ] # This triggers whenever you "git push" to your fork
+    branches: [ main ]
 
 jobs:
   build:
@@ -24,13 +24,15 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync ios
 
-      - name: Build iOS Project
+      - name: Build iOS Project (Signing Bypass)
         run: |
-          # We are removing '--no-open' and using standard Xcode flags
-          npx cap build ios -- --codeSignIdentity="" --developmentTeam="" --provisioningProfile=""
+          # We enter the iOS folder and run a direct Xcode build command
+          # CODE_SIGNING_ALLOWED=NO is the "magic" part that stops the crash
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-app-data
-          path: ios/App/
+          name: ios-app-debug
+          # This path points to the raw compiled app folder
+          path: ios/App/build/Debug-iphoneos/App.app

@@ -25,19 +25,16 @@ jobs:
         run: npx cap sync ios
 
       - name: Build iOS Project (Signing Bypass)
+        # We tell GitHub exactly which folder to enter
+        working-directory: ios/App
         run: |
-          # This command finds where the .xcworkspace is and enters that folder
-          cd $(find . -name "*.xcworkspace" -exec dirname {} \;)
-          
-          # Now we run the build in the correct spot
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO 
-          
-          # Create a build folder we can easily find for the upload step
-          mkdir -p ../../build-output
-          cp -R build/Debug-iphoneos/App.app ../../build-output/
+          # 1. List files just so we can see them in the log (helps us debug)
+          ls -R
+          # 2. Run the build
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-app-debug
-          path: build-output/App.app
+          path: ios/App/build/Debug-iphoneos/App.app

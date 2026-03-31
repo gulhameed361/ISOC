@@ -25,7 +25,7 @@ jobs:
         run: npx cap sync ios
 
       - name: Build iOS Project
-        run: npx cap build ios --no-open
+        run: npx cap build ios
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4

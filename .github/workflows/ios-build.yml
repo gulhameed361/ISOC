@@ -25,7 +25,9 @@ jobs:
         run: npx cap sync ios
 
       - name: Build iOS Project
-        run: npx cap build ios
+        run: |
+          # We tell Xcode to build without needing a physical Apple device or a paid account
+          npx cap build ios --no-open -- --codeSignIdentity="" --developmentTeam="" --provisioningProfile=""
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4

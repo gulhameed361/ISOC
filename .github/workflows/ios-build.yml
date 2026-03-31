@@ -26,8 +26,8 @@ jobs:
 
       - name: Build iOS Project
         run: |
-          # We tell Xcode to build without needing a physical Apple device or a paid account
-          npx cap build ios --no-open -- --codeSignIdentity="" --developmentTeam="" --provisioningProfile=""
+          # We are removing '--no-open' and using standard Xcode flags
+          npx cap build ios -- --codeSignIdentity="" --developmentTeam="" --provisioningProfile=""
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4

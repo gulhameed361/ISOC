@@ -25,10 +25,9 @@ jobs:
         run: npx cap sync ios
 
       - name: Build iOS Project (Signing Bypass)
-        working-directory: ios/App
         run: |
-          # Use 'project' instead of 'App' to match your actual files
-          xcodebuild -workspace project.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO
+          # We provide the direct path starting from the root of your project
+          xcodebuild -workspace ios/App/project.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4

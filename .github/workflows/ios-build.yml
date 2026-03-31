@@ -25,25 +25,27 @@ jobs:
         run: npx cap sync ios
 
       - name: Build and Package iOS App
-        # We tell the Mac exactly where the Xcode project is
-        working-directory: ios/App
         run: |
-          # 1. Build the raw app
-          xcodebuild -workspace project.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO
+          # 1. Find the workspace file no matter where it is hiding (The Detective)
+          WORKSPACE_PATH=$(find . -name "project.xcworkspace" | head -n 1)
+          echo "Found workspace at: $WORKSPACE_PATH"
           
-          # 2. Navigate to where Xcode put the finished app
-          cd build/Debug-iphoneos
+          # 2. Build the app and force it to output into a folder called 'build-output'
+          xcodebuild -workspace "$WORKSPACE_PATH" -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath build-output
           
-          # 3. Create the Payload folder and move the app inside
+          # 3. Navigate into that specific output folder
+          cd build-output/Build/Products/Debug-iphoneos
+          
+          # 4. Create the Payload folder and copy the app inside
           mkdir -p Payload
           cp -R App.app Payload/
           
-          # 4. Zip it securely into an IPA (This preserves the Apple permissions!)
+          # 5. Zip it securely into an IPA (Preserving Apple's execution permissions!)
           zip -qr SurreyISOC.ipa Payload
 
       - name: Upload Final IPA
         uses: actions/upload-artifact@v4
         with:
           name: SurreyISOC-App
-          # Upload the perfectly packaged file
-          path: ios/App/build/Debug-iphoneos/SurreyISOC.ipa
+          # Point directly to the newly zipped IPA
+          path: build-output/Build/Products/Debug-iphoneos/SurreyISOC.ipa

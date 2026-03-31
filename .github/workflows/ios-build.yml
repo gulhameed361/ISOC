@@ -24,18 +24,26 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync ios
 
-      - name: Build iOS Project (Signing Bypass)
+      - name: Build and Package iOS App
+        # We tell the Mac exactly where the Xcode project is
+        working-directory: ios/App
         run: |
-          # Find the workspace file no matter where it is hiding
-          WORKSPACE_PATH=$(find . -name "project.xcworkspace" | head -n 1)
-          echo "Found workspace at: $WORKSPACE_PATH"
+          # 1. Build the raw app
+          xcodebuild -workspace project.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO
           
-          # Run the build using that found path
-          xcodebuild -workspace "$WORKSPACE_PATH" -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath build-output
+          # 2. Navigate to where Xcode put the finished app
+          cd build/Debug-iphoneos
+          
+          # 3. Create the Payload folder and move the app inside
+          mkdir -p Payload
+          cp -R App.app Payload/
+          
+          # 4. Zip it securely into an IPA (This preserves the Apple permissions!)
+          zip -qr SurreyISOC.ipa Payload
 
-      - name: Upload Build Artifact
+      - name: Upload Final IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ios-app-debug
-          # This path matches the 'derivedDataPath' we set above
-          path: build-output/Build/Products/Debug-iphoneos/App.app
+          name: SurreyISOC-App
+          # Upload the perfectly packaged file
+          path: ios/App/build/Debug-iphoneos/SurreyISOC.ipa

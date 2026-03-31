@@ -26,12 +26,16 @@ jobs:
 
       - name: Build iOS Project (Signing Bypass)
         run: |
-          # We provide the direct path starting from the root of your project
-          xcodebuild -workspace ios/App/project.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO
+          # Find the workspace file no matter where it is hiding
+          WORKSPACE_PATH=$(find . -name "project.xcworkspace" | head -n 1)
+          echo "Found workspace at: $WORKSPACE_PATH"
+          
+          # Run the build using that found path
+          xcodebuild -workspace "$WORKSPACE_PATH" -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath build-output
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-app-debug
-          # Path stays the same as it builds into the same output folder
-          path: ios/App/build/Debug-iphoneos/App.app
+          # This path matches the 'derivedDataPath' we set above
+          path: build-output/Build/Products/Debug-iphoneos/App.app

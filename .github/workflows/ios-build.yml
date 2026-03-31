@@ -25,14 +25,14 @@ jobs:
         run: npx cap sync ios
 
       - name: Build iOS Project (Signing Bypass)
+        # We tell GitHub to run this command INSIDE the ios/App folder
+        working-directory: ios/App
         run: |
-          # We enter the iOS folder and run a direct Xcode build command
-          # CODE_SIGNING_ALLOWED=NO is the "magic" part that stops the crash
-          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-app-debug
-          # This path points to the raw compiled app folder
+          # This is the standard path where Xcode drops the Debug build
           path: ios/App/build/Debug-iphoneos/App.app

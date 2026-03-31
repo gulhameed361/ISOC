@@ -26,26 +26,28 @@ jobs:
 
       - name: Build and Package iOS App
         run: |
-          # 1. Find the workspace file no matter where it is hiding
+          # 1. Find the workspace file dynamically
           WORKSPACE_PATH=$(find . -name "project.xcworkspace" | head -n 1)
           echo "Found workspace at: $WORKSPACE_PATH"
           
-          # 2. Build the app using the RELEASE configuration
+          # 2. Build the app using the RELEASE configuration for independent running
           xcodebuild -workspace "$WORKSPACE_PATH" -scheme App -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath build-output
           
-          # 3. Navigate into the Release output folder
+          # 3. Navigate into the specific Release output folder
           cd build-output/Build/Products/Release-iphoneos
           
-          # 4. Create the Payload folder and copy the app inside
+          # 4. Create the Payload folder required by iOS
           mkdir -p Payload
-          cp -R App.app Payload/
           
-          # 5. Zip it securely into an IPA
-          zip -qr SurreyISOC.ipa Payload
+          # 5. MOVE the app inside (mv is safer than cp for complex bundles)
+          mv App.app Payload/
+          
+          # 6. Zip into an IPA (-y is CRITICAL to preserve Apple's internal symlinks)
+          zip -qry SurreyISOC.ipa Payload
 
       - name: Upload Final IPA
         uses: actions/upload-artifact@v4
         with:
           name: SurreyISOC-App
-          # Point directly to the newly zipped Release IPA
+          # Upload the perfectly packaged and permission-preserved file
           path: build-output/Build/Products/Release-iphoneos/SurreyISOC.ipa

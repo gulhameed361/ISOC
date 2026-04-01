@@ -3,18 +3,24 @@ image: macos-14-xcode-15
 stages:
   - build
 
-build_ios:
+variables:
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+
+build_ios_app:
   stage: build
   tags:
     - saas-macos-medium-m1
   script:
+    - node -v
     - npm install
-    - npm run build
-    # These two lines replace 'npx cap edit' for a cloud server:
-    - npx cap sync ios
-    - npx cap update ios
+    - npm run build          # This creates the 'dist' (or 'build') folder
     
-    # Build Command
+    # These three commands are the "Bridge" between Web and iOS
+    - npx cap sync ios       # Syncs plugins and IDs
+    - npx cap copy ios       # COPIES your 'dist' folder into the iOS App
+    - npx cap update ios     # Final check of native dependencies
+    
+    # The actual Apple compile process
     - xcodebuild -workspace ios/App/App.xcworkspace 
       -scheme App 
       -configuration Release 
@@ -23,11 +29,13 @@ build_ios:
       CODE_SIGNING_REQUIRED=NO 
       -derivedDataPath build-output
 
-    # Packaging
+    # Create the IPA for SideStore
     - cd build-output/Build/Products/Release-iphoneos
     - mkdir -p Payload
     - cp -R App.app Payload/
     - zip -qry SurreyISOC.ipa Payload
+
   artifacts:
     paths:
       - build-output/Build/Products/Release-iphoneos/SurreyISOC.ipa
+    expire_in: 1 week

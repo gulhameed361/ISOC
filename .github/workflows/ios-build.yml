@@ -3,7 +3,6 @@ name: Build iOS App
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:
 
 jobs:
   build:
@@ -23,19 +22,15 @@ jobs:
       - name: Build Web Project
         run: npm run build
 
-      - name: Sync Capacitor
-        run: npx cap sync ios
+      - name: Sync and Copy Capacitor
+        run: |
+          npx cap sync ios
+          npx cap copy ios  # This moves the 'dist' folder into the iOS app
+          npx cap update ios
 
       - name: Build and Package iOS App
         run: |
-          # 1. Find the workspace file
-          WORKSPACE_PATH=$(find ios -name "*.xcworkspace" | head -n 1)
-          echo "Found workspace at: $WORKSPACE_PATH"
-          
-          # 2. Build the app using Release configuration
-          # We disable signing here so GitHub can finish the build, 
-          # but we keep the structure intact for SideStore.
-          xcodebuild -workspace "$WORKSPACE_PATH" \
+          xcodebuild -workspace ios/App/App.xcworkspace \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
@@ -44,17 +39,9 @@ jobs:
             ENTITLEMENTS_ALLOWED=NO \
             -derivedDataPath build-output
 
-          # 3. Navigate to the build folder
           cd build-output/Build/Products/Release-iphoneos
-          
-          # 4. Create the Payload folder (Required for .ipa)
           mkdir -p Payload
-          
-          # 5. Copy the app bundle into Payload
           cp -R App.app Payload/
-          
-          # 6. Package into IPA 
-          # -y is CRITICAL to preserve symlinks; -r is for recursive
           zip -qry SurreyISOC.ipa Payload
 
       - name: Upload Final IPA
@@ -62,4 +49,3 @@ jobs:
         with:
           name: SurreyISOC-App
           path: build-output/Build/Products/Release-iphoneos/SurreyISOC.ipa
-          retention-days: 7

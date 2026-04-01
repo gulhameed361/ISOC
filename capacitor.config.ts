@@ -4,9 +4,15 @@ const config: CapacitorConfig = {
   appId: 'com.surreyisoc.prayerroom',
   appName: 'ISOC Prayer Room',
   webDir: 'dist',
+  // ADD THIS BLOCK BELOW:
+  server: {
+    iosScheme: 'capacitor',
+    hostname: 'localhost',
+    androidScheme: 'https'
+  },
   plugins: {
     FirebaseAuthentication: {
-      skipNativeAuth: true,
+      skipNativeAuth: false, // Changed to false to allow the native iOS SDK to handle the handshake
       providers: ['google.com'],
     },
   },

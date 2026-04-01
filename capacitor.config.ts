@@ -12,7 +12,7 @@ const config: CapacitorConfig = {
   },
   plugins: {
     FirebaseAuthentication: {
-      skipNativeAuth: false, // Changed to false to allow the native iOS SDK to handle the handshake
+      skipNativeAuth: true, // Keep this true so your existing App.tsx logic works
       providers: ['google.com'],
     },
   },

@@ -25,12 +25,16 @@ jobs:
       - name: Sync and Copy Capacitor
         run: |
           npx cap sync ios
-          npx cap copy ios  # This moves the 'dist' folder into the iOS app
+          npx cap copy ios
           npx cap update ios
 
       - name: Build and Package iOS App
         run: |
-          xcodebuild -workspace ios/App/App.xcworkspace \
+          # This command finds the workspace automatically to avoid the "does not exist" error
+          WORKSPACE_PATH=$(find . -name "*.xcworkspace" | head -n 1)
+          echo "Found workspace at: $WORKSPACE_PATH"
+          
+          xcodebuild -workspace "$WORKSPACE_PATH" \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
@@ -41,7 +45,7 @@ jobs:
 
           cd build-output/Build/Products/Release-iphoneos
           mkdir -p Payload
-          cp -R App.app Payload/
+          cp -R *.app Payload/
           zip -qry SurreyISOC.ipa Payload
 
       - name: Upload Final IPA

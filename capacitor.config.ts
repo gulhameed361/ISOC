@@ -5,13 +5,13 @@ const config: CapacitorConfig = {
   appName: 'ISOC Prayer Room',
   webDir: 'dist',
   server: {
-    iosScheme: 'ionic', 
+    iosScheme: 'ionic',
     hostname: 'localhost',
     androidScheme: 'https'
   },
   plugins: {
     FirebaseAuthentication: {
-      // CRITICAL: Set to false so the native iOS pop-up handles the login
+      // Must be false to use the Native iOS popup and SHA-1 fingerprint
       skipNativeAuth: false,
       providers: ['google.com'],
     },

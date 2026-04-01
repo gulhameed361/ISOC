@@ -28,25 +28,29 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedMonth, setSelectedMonth] = useState<number>(Math.max(new Date().getMonth(), DEFAULT_START_MONTH));
 
+  // 1. Monitor Auth State Changes (Web & Initial Load)
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!isAuthReady) {
-        setAuthError("Auth Init Timeout - Check Config");
-        setIsAuthReady(true); 
-      }
-    }, 10000);
-
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      clearTimeout(timeout);
       setUser(currentUser);
       setIsAuthReady(true);
     });
 
-    return () => {
-      unsubscribe();
-      clearTimeout(timeout);
-    };
-  }, [isAuthReady]);
+    return () => unsubscribe();
+  }, []);
+
+  // 2. NATIVE LISTENER: Catches the success signal from the iOS Google Popup
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      const listener = FirebaseAuthentication.addListener('authStateChange', (event) => {
+        if (event.user) {
+          // Force a quick refresh to pick up the new user session
+          setIsAuthReady(false);
+          setTimeout(() => setIsAuthReady(true), 100);
+        }
+      });
+      return () => { listener.remove(); };
+    }
+  }, []);
 
   const handleLogin = async () => {
     setAuthError(null);
@@ -54,25 +58,20 @@ export default function App() {
 
     try {
       if (Capacitor.isNativePlatform()) {
-        // 1. Native Call
+        // Trigger the Native iOS System Popup
         const result = await FirebaseAuthentication.signInWithGoogle({
           scopes: ['email', 'profile'],
           skipNativeAuth: false, 
         });
 
+        // Manual Bridge: Hand the token to the Firebase Web SDK
         if (result.credential) {
-          // alert("Native Success! Bridging to Web SDK...");
           const credential = GoogleAuthProvider.credential(
             result.credential.idToken ?? undefined,
             result.credential.accessToken ?? undefined
           );
-          
           await signInWithCredential(auth, credential);
-          // alert("Firebase Web SDK Linked!");
-        } else {
-          throw new Error("No credentials returned from Google.");
         }
-
         setIsLoggingIn(false);
         return;
       }
@@ -85,21 +84,14 @@ export default function App() {
     } catch (error: any) {
       setIsLoggingIn(false);
       if (error.message?.includes('cancel')) return;
-      
-      const errorCode = error?.code || "unknown-error";
-      const errorMessage = error?.message || "Check Firebase Console Settings";
-      setAuthError(`${errorCode}: ${errorMessage}`);
-      alert(`Login Error: ${errorCode}`);
+      setAuthError(error?.code || 'Authentication failed. Please try again.');
     }
   };
 
   if (!isAuthReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm">Initializing ISOC...</p>
-        </div>
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -107,7 +99,7 @@ export default function App() {
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6">
-        <div className="w-24 h-24 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden border-4 border-primary/10 mb-8 shadow-xl">
+        <div className="w-24 h-24 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden mb-8 shadow-xl">
           <img 
             alt="ISOC Logo" 
             className="w-full h-full object-cover"
@@ -115,21 +107,19 @@ export default function App() {
             onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")}
           />
         </div>
-        <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-2 text-center">ISOC Prayer Room</h1>
+        <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-2">ISOC Prayer Room</h1>
         <p className="font-body text-on-surface-variant text-center mb-12">Sign in to access schedules.</p>
         
         <button 
           onClick={handleLogin}
           disabled={isLoggingIn}
-          className="bg-primary text-on-primary font-headline font-bold py-4 px-8 rounded-full shadow-lg w-full max-w-xs flex items-center justify-center gap-3"
+          className="bg-primary text-on-primary font-headline font-bold py-4 px-8 rounded-full shadow-lg w-full max-w-xs"
         >
           {isLoggingIn ? 'Signing in...' : 'Continue with Google'}
         </button>
 
         {authError && (
-          <div className="mt-6 p-4 bg-red-50 rounded-lg border border-red-200">
-            <p className="text-sm text-red-600 text-center font-medium">⚠️ {authError}</p>
-          </div>
+          <p className="mt-6 text-sm text-red-600 text-center font-medium">⚠️ {authError}</p>
         )}
       </div>
     );

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { onAuthStateChanged, signInWithPopup, signInWithCredential, GoogleAuthProvider, User } from 'firebase/auth';
+import { onAuthStateChanged, GoogleAuthProvider, User, signInWithCredential } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth, googleProvider } from './firebase';
@@ -24,10 +24,10 @@ export default function App() {
   const [selectedMonth, setSelectedMonth] = useState<number>(Math.max(new Date().getMonth(), DEFAULT_START_MONTH));
 
   useEffect(() => {
-    // Safety Valve: If Firebase doesn't respond in 6 seconds, show an error
+    // Safety Valve: Stop spinner after 6 seconds if Firebase hangs
     const timeout = setTimeout(() => {
       if (!isAuthReady) {
-        setAuthError("Authentication timed out. Please check your internet or Firebase config.");
+        setAuthError("Connection timed out. Check your internet.");
         setIsAuthReady(true); 
       }
     }, 6000);
@@ -49,32 +49,25 @@ export default function App() {
     setIsLoggingIn(true);
 
     try {
-      googleProvider.setCustomParameters({ prompt: 'select_account' });
-
       if (Capacitor.isNativePlatform()) {
+        // NATIVE iOS LOGIN FLOW
         const result = await FirebaseAuthentication.signInWithGoogle({
           scopes: ['email', 'profile'],
-          skipNativeAuth: true,
+          skipNativeAuth: false, // Uses the system pop-up
         });
 
-        const idToken = result.credential?.idToken;
-        const accessToken = result.credential?.accessToken;
-        
-        if (!idToken && !accessToken) {
-          throw new Error('Missing Google credential token from native sign-in.');
-        }
-
-        const credential = GoogleAuthProvider.credential(idToken ?? undefined, accessToken ?? undefined);
-        await signInWithCredential(auth, credential);
+        // The plugin handles Firebase Auth automatically when skipNativeAuth is false
         setIsLoggingIn(false);
         return;
       }
 
+      // WEB / BROWSER LOGIN FLOW
+      const { signInWithPopup } = await import('firebase/auth');
       await signInWithPopup(auth, googleProvider);
       setIsLoggingIn(false);
     } catch (error: any) {
       setIsLoggingIn(false);
-      setAuthError(error?.message || 'Authentication failed. Please try again.');
+      setAuthError(error?.code ? `${error.code}: ${error.message}` : 'Authentication failed.');
       console.error("Login failed:", error);
     }
   };
@@ -97,18 +90,18 @@ export default function App() {
           <img 
             alt="ISOC Logo" 
             className="w-full h-full object-cover"
-            src="./images/ISOC.png" // FIXED: Added relative dot
+            src="./images/ISOC.png"
             referrerPolicy="no-referrer"
             onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150?text=ISOC")}
           />
         </div>
         <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-2 text-center">ISOC Prayer Room</h1>
-        <p className="font-body text-on-surface-variant text-center mb-12 max-w-xs">Sign in to access the latest prayer schedules and ISOC updates.</p>
+        <p className="font-body text-on-surface-variant text-center mb-12 max-w-xs">Sign in to access the latest prayer schedules.</p>
         
         <button 
           onClick={handleLogin}
           disabled={isLoggingIn}
-          className="bg-primary text-on-primary font-headline font-bold py-4 px-8 rounded-full shadow-lg hover:shadow-xl hover:bg-primary-container transition-all active:scale-95 w-full max-w-xs flex items-center justify-center gap-3"
+          className="bg-primary text-on-primary font-headline font-bold py-4 px-8 rounded-full shadow-lg w-full max-w-xs flex items-center justify-center gap-3 active:scale-95 transition-transform"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -132,47 +125,19 @@ export default function App() {
 
   const renderScreen = () => {
     if (activeTab === 'info' && selectedLocationId) {
-      return (
-        <LocationDetailScreen 
-          locationId={selectedLocationId} 
-          onBack={() => setSelectedLocationId(null)} 
-        />
-      );
+      return <LocationDetailScreen locationId={selectedLocationId} onBack={() => setSelectedLocationId(null)} />;
     }
-
     switch (activeTab) {
-      case 'home': 
-        return (
-          <HomeScreen 
-            onViewCalendar={() => setActiveTab('schedule')} 
-            selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
-          />
-        );
-      case 'schedule': 
-        return (
-          <ScheduleScreen 
-            selectedMonth={selectedMonth}
-            onMonthChange={(month) => setSelectedMonth(Math.max(month, DEFAULT_START_MONTH))}
-            onDateChange={(date) => {
-              setSelectedDate(date);
-              setActiveTab('home');
-            }}
-          />
-        );
+      case 'home': return <HomeScreen onViewCalendar={() => setActiveTab('schedule')} selectedDate={selectedDate} onDateChange={setSelectedDate} />;
+      case 'schedule': return <ScheduleScreen selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} onDateChange={(date) => { setSelectedDate(date); setActiveTab('home'); }} />;
       case 'scan': return <ScanScreen />;
-      case 'info': return <InfoScreen onLocationClick={(id) => setSelectedLocationId(id)} />;
+      case 'info': return <InfoScreen onLocationClick={setSelectedLocationId} />;
       default: return <HomeScreen />;
     }
   };
 
-  const handleTabChange = (tab: AppTab) => {
-    setActiveTab(tab);
-    setSelectedLocationId(null);
-  };
-
   return (
-    <Layout activeTab={activeTab} onTabChange={handleTabChange}>
+    <Layout activeTab={activeTab} onTabChange={setActiveTab}>
       {renderScreen()}
     </Layout>
   );

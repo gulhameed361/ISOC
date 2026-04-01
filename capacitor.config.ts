@@ -4,15 +4,15 @@ const config: CapacitorConfig = {
   appId: 'com.surreyisoc.prayerroom',
   appName: 'ISOC Prayer Room',
   webDir: 'dist',
-  // ADD THIS BLOCK BELOW:
   server: {
-    iosScheme: 'capacitor',
+    // CHANGE THIS: 'capacitor' is often blocked/unregistered
+    iosScheme: 'ionic', 
     hostname: 'localhost',
     androidScheme: 'https'
   },
   plugins: {
     FirebaseAuthentication: {
-      skipNativeAuth: true, // Keep this true so your existing App.tsx logic works
+      skipNativeAuth: true,
       providers: ['google.com'],
     },
   },

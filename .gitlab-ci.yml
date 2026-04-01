@@ -1,25 +1,20 @@
-# GitLab-CI for Capacitor iOS Build
 image: macos-14-xcode-15
 
 stages:
   - build
 
-variables:
-  # This prevents Homebrew from wasting time updating during your build
-  HOMEBREW_NO_AUTO_UPDATE: "1"
-
-build_ios_app:
+build_ios:
   stage: build
   tags:
-    - saas-macos-medium-m1  # This tells GitLab to use a Mac runner
+    - saas-macos-medium-m1
   script:
-    - node -v
     - npm install
     - npm run build
+    # These two lines replace 'npx cap edit' for a cloud server:
     - npx cap sync ios
     - npx cap update ios
     
-    # Build the iOS Workspace
+    # Build Command
     - xcodebuild -workspace ios/App/App.xcworkspace 
       -scheme App 
       -configuration Release 
@@ -28,13 +23,11 @@ build_ios_app:
       CODE_SIGNING_REQUIRED=NO 
       -derivedDataPath build-output
 
-    # Prepare the Payload for SideStore
+    # Packaging
     - cd build-output/Build/Products/Release-iphoneos
     - mkdir -p Payload
     - cp -R App.app Payload/
     - zip -qry SurreyISOC.ipa Payload
-
   artifacts:
     paths:
       - build-output/Build/Products/Release-iphoneos/SurreyISOC.ipa
-    expire_in: 1 week

@@ -23,6 +23,16 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
     
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>com.googleusercontent.apps.YOUR_REVERSED_CLIENT_ID</string>
+        </array>
+      </dict>
+    </array>
+
     <key>NSCameraUsageDescription</key>
     <string>We need camera access to scan QR codes for events.</string>
     <key>NSPhotoLibraryUsageDescription</key>
@@ -35,7 +45,8 @@
     
     <key>UIRequiredDeviceCapabilities</key>
     <array>
-        <string>arm64</string> </array>
+        <string>arm64</string>
+    </array>
     
     <key>UISupportedInterfaceOrientations</key>
     <array>

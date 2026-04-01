@@ -1,10 +1,10 @@
 {
-  "projectId": "gen-lang-client-0970134198",
-  "appId": "1:398749390897:web:cc9699b7a3544ba6ce1d10",
-  "apiKey": "AIzaSyD1e6Is7BdD2_UvaiiJYDr0mUNRL2WYf1Y",
-  "authDomain": "gen-lang-client-0970134198.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-2214ddfe-398f-41c9-9145-1fbef635bcb9",
-  "storageBucket": "gen-lang-client-0970134198.firebasestorage.app",
-  "messagingSenderId": "398749390897",
+  "projectId": "isoc-prayer-room",
+  "appId": "1:1037852440998:ios:01109fed46c6f919747767",
+  "apiKey": "AIzaSyDqCzYxGoq4UvEHvNRXz8D2J9MYex7l83Q",
+  "authDomain": "isoc-prayer-room.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "isoc-prayer-room.firebasestorage.app",
+  "messagingSenderId": "1037852440998",
   "measurementId": ""
 }

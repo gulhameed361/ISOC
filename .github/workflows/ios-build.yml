@@ -30,7 +30,7 @@ jobs:
 
       - name: Build and Package iOS App
         run: |
-          # This command finds the workspace automatically to avoid the "does not exist" error
+          # Automatically find the workspace file anywhere in the project
           WORKSPACE_PATH=$(find . -name "*.xcworkspace" | head -n 1)
           echo "Found workspace at: $WORKSPACE_PATH"
           

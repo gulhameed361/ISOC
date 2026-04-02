@@ -6,11 +6,10 @@ import {
   signInWithCredential 
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
-// Import for v8.2.0
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth } from './firebase';
 
-// Components
+// Components - Ensure these paths match your folder structure exactly
 import { Layout } from './components/Layout';
 import { HomeScreen } from './components/HomeScreen';
 import { ScheduleScreen } from './components/ScheduleScreen';
@@ -31,34 +30,47 @@ export default function App() {
 
   const loginTimeoutRef = useRef<any>(null);
 
-  // 1. Initial Auth Check
+  // 1. Initial Auth Check with 5-second "Heartbeat" Force-Start
   useEffect(() => {
+    console.log("App: Initializing Auth Listener...");
+    
+    // If Firebase is silent for 5 seconds, force the UI to show the login screen
+    const forceStartTimeout = setTimeout(() => {
+      if (!isAuthReady) {
+        console.warn("App: Firebase hang detected. Force-starting UI...");
+        setIsAuthReady(true);
+      }
+    }, 5000);
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log("Firebase Auth Change:", currentUser?.email || "Logged Out");
+      console.log("App: Firebase Auth State Changed ->", currentUser?.email || "Logged Out");
+      clearTimeout(forceStartTimeout); 
       setUser(currentUser);
       setIsAuthReady(true);
       setIsLoggingIn(false);
       if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      unsubscribe();
+      clearTimeout(forceStartTimeout);
+    };
+  }, [isAuthReady]);
 
-  // 2. v8.2.0 Native Listener
+  // 2. Native Auth Listener (Specifically for Capacitor 6 / v8.2.0)
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
-      // In v8.x, the listener returns an 'unlisten' function
-      const promise = FirebaseAuthentication.addListener('authStateChange', (event) => {
-        console.log("Native Auth Event:", event.user ? "User Present" : "No User");
-        // Force React to sync with the Native user
-        if (event.user) {
-           // We don't manually set user here to avoid SDK conflicts
-           // We let the onAuthStateChanged handle the UI flip
-        }
-      });
-      
+      const setupListener = async () => {
+        const handler = await FirebaseAuthentication.addListener('authStateChange', (event) => {
+          console.log("App: Native Auth Event ->", event.user ? "User Detected" : "No User");
+          // If a user is detected natively, we let onAuthStateChanged handle the UI flip
+        });
+        return handler;
+      };
+
+      const listenerPromise = setupListener();
       return () => {
-        promise.then(l => l.remove());
+        listenerPromise.then(l => l.remove());
       };
     }
   }, []);
@@ -67,72 +79,86 @@ export default function App() {
     try {
       setAuthError(null);
       setIsLoggingIn(true);
+      console.log("App: Starting Login Flow...");
 
-      // 15s Timeout
+      // 15s Safety Timeout for the login button spinner
       loginTimeoutRef.current = setTimeout(() => {
         setIsLoggingIn(false);
-        setAuthError("Login timed out. Please try again.");
+        setAuthError("Sign-in timed out. Please try again.");
       }, 15000);
 
       if (Capacitor.isNativePlatform()) {
-        // v8.2.0 Syntax
+        // Native Google Sign-In
         const result = await FirebaseAuthentication.signInWithGoogle();
 
         if (result.credential) {
+          console.log("App: Native tokens received, bridging to Web SDK...");
           const credential = GoogleAuthProvider.credential(
-            result.credential.idToken,
-            result.credential.accessToken
+            result.credential.idToken ?? undefined,
+            result.credential.accessToken ?? undefined
           );
-          // Manually sign in the Web SDK so the UI updates
+          // This bridges the native session to the auth object in firebase.ts
           await signInWithCredential(auth, credential);
         }
       } else {
+        // Web Browser Fallback
         const { signInWithPopup, GoogleAuthProvider: WebProvider } = await import('firebase/auth');
         await signInWithPopup(auth, new WebProvider());
       }
     } catch (error: any) {
-      console.error("Login Error:", error);
+      console.error("App: Login Error ->", error);
       setIsLoggingIn(false);
       if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
-      if (error.message?.includes('cancel')) return;
-      setAuthError(error.code || "Failed to sign in.");
+      
+      // Don't show error if user just swiped away the popup
+      if (error.message?.includes('cancel') || error.code?.includes('cancelled')) return;
+      
+      setAuthError(error.code || "Authentication failed.");
     }
   };
 
-  // --- Rendering ---
+  // --- RENDER LOGIC ---
 
   if (!isAuthReady) {
     return (
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8f9fa' }}>
-        <div className="animate-spin" style={{ width: '30px', height: '30px', border: '4px solid #004d40', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
-        <p style={{ marginTop: '20px', fontSize: '14px', color: '#666' }}>Starting ISOC App...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+        <div className="w-10 h-10 border-4 border-emerald-800 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-gray-600 font-medium">Starting ISOC App...</p>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6">
-        <div className="w-24 h-24 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden mb-8 shadow-xl">
-          <img alt="ISOC Logo" className="w-full h-full object-cover" src="./images/ISOC.png" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
+        <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center overflow-hidden mb-8 shadow-lg">
+          <img 
+            alt="ISOC Logo" 
+            className="w-full h-full object-cover" 
+            src="./images/ISOC.png" 
+            onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} 
+          />
         </div>
-        <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-2">ISOC Prayer Room</h1>
-        <p className="font-body text-on-surface-variant text-center mb-12">Sign in to view schedules.</p>
+        <h1 className="font-bold text-3xl text-slate-900 mb-2">ISOC Prayer Room</h1>
+        <p className="text-slate-500 text-center mb-12">Sign in with your University account.</p>
         
         <button 
           onClick={handleLogin}
           disabled={isLoggingIn}
-          className="bg-primary text-on-primary font-headline font-bold py-4 px-8 rounded-full shadow-lg w-full max-w-xs active:scale-95 transition-all"
+          className="bg-emerald-800 text-white font-bold py-4 px-10 rounded-full shadow-md w-full max-w-xs active:scale-95 transition-transform disabled:opacity-70"
         >
           {isLoggingIn ? 'Signing in...' : 'Continue with Google'}
         </button>
 
-        {authError && <p style={{ color: 'red', marginTop: '20px' }}>{authError}</p>}
+        {authError && (
+          <div className="mt-6 p-3 bg-red-50 border border-red-100 rounded-lg">
+            <p className="text-sm text-red-600 font-medium">⚠️ {authError}</p>
+          </div>
+        )}
       </div>
     );
   }
 
-  // --- Main App Views ---
   const renderScreen = () => {
     if (activeTab === 'info' && selectedLocationId) {
       return <LocationDetailScreen locationId={selectedLocationId} onBack={() => setSelectedLocationId(null)} />;

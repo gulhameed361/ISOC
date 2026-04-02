@@ -1,10 +1,5 @@
-import { useState, useEffect } from 'react';
-import { 
-  onAuthStateChanged, 
-  GoogleAuthProvider, 
-  User, 
-  signInWithCredential 
-} from 'firebase/auth';
+import { useState, useEffect, useRef } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth } from './firebase';
@@ -28,24 +23,35 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedMonth, setSelectedMonth] = useState<number>(Math.max(new Date().getMonth(), DEFAULT_START_MONTH));
 
-  // 1. Monitor Auth State Changes (Web & Initial Load)
+  // Safety net to prevent infinite "Signing in..." state
+  const loginTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 1. Primary Auth Listener (Web & Native Bridge)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log("Auth State Changed:", currentUser?.email || "No User");
       setUser(currentUser);
       setIsAuthReady(true);
+      
+      // If we were waiting for a login, stop the spinner now
+      if (loginTimeoutRef.current) {
+        clearTimeout(loginTimeoutRef.current);
+        loginTimeoutRef.current = null;
+      }
+      setIsLoggingIn(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // 2. NATIVE LISTENER: Catches the success signal from the iOS Google Popup
+  // 2. Native Listener (Ensures the UI updates immediately on iOS)
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       const listener = FirebaseAuthentication.addListener('authStateChange', (event) => {
         if (event.user) {
-          // Force a quick refresh to pick up the new user session
-          setIsAuthReady(false);
-          setTimeout(() => setIsAuthReady(true), 100);
+          // Update the user object directly from the native event
+          setUser(event.user as any); 
+          setIsLoggingIn(false);
         }
       });
       return () => { listener.remove(); };
@@ -56,23 +62,22 @@ export default function App() {
     setAuthError(null);
     setIsLoggingIn(true);
 
+    // Safety timeout: If nothing happens in 15 seconds, unblock the UI
+    loginTimeoutRef.current = setTimeout(() => {
+      if (isLoggingIn) {
+        setIsLoggingIn(false);
+        setAuthError("Sign-in timed out. Please check your connection.");
+      }
+    }, 15000);
+
     try {
       if (Capacitor.isNativePlatform()) {
-        // Trigger the Native iOS System Popup
-        const result = await FirebaseAuthentication.signInWithGoogle({
+        // Pattern A: The plugin handles the Firebase sign-in internally.
+        // We DO NOT call signInWithCredential here.
+        await FirebaseAuthentication.signInWithGoogle({
           scopes: ['email', 'profile'],
-          skipNativeAuth: false, 
         });
-
-        // Manual Bridge: Hand the token to the Firebase Web SDK
-        if (result.credential) {
-          const credential = GoogleAuthProvider.credential(
-            result.credential.idToken ?? undefined,
-            result.credential.accessToken ?? undefined
-          );
-          await signInWithCredential(auth, credential);
-        }
-        setIsLoggingIn(false);
+        // The onAuthStateChanged listener above will handle the rest.
         return;
       }
 
@@ -80,14 +85,18 @@ export default function App() {
       const { signInWithPopup, GoogleAuthProvider: WebProvider } = await import('firebase/auth');
       const provider = new WebProvider();
       await signInWithPopup(auth, provider);
-      setIsLoggingIn(false);
     } catch (error: any) {
       setIsLoggingIn(false);
-      if (error.message?.includes('cancel')) return;
-      setAuthError(error?.code || 'Authentication failed. Please try again.');
+      if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
+      
+      // Ignore user cancellations
+      if (error.message?.includes('cancel') || error.code === 'auth/cancelled-popup-request') return;
+      
+      setAuthError(error?.code || 'Authentication failed.');
     }
   };
 
+  // --- UI RENDER LOGIC (Unchanged) ---
   if (!isAuthReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -100,26 +109,21 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6">
         <div className="w-24 h-24 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden mb-8 shadow-xl">
-          <img 
-            alt="ISOC Logo" 
-            className="w-full h-full object-cover"
-            src="./images/ISOC.png"
-            onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")}
-          />
+          <img alt="ISOC Logo" className="w-full h-full object-cover" src="./images/ISOC.png" onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} />
         </div>
         <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-2">ISOC Prayer Room</h1>
-        <p className="font-body text-on-surface-variant text-center mb-12">Sign in to access schedules.</p>
+        <p className="font-body text-on-surface-variant text-center mb-12 max-w-xs">Sign in to access the latest prayer schedules.</p>
         
         <button 
           onClick={handleLogin}
           disabled={isLoggingIn}
-          className="bg-primary text-on-primary font-headline font-bold py-4 px-8 rounded-full shadow-lg w-full max-w-xs"
+          className="bg-primary text-on-primary font-headline font-bold py-4 px-8 rounded-full shadow-lg w-full max-w-xs flex items-center justify-center gap-3 active:scale-95 transition-all"
         >
           {isLoggingIn ? 'Signing in...' : 'Continue with Google'}
         </button>
 
         {authError && (
-          <p className="mt-6 text-sm text-red-600 text-center font-medium">⚠️ {authError}</p>
+          <p className="mt-6 text-sm text-red-600 text-center font-medium font-body">⚠️ {authError}</p>
         )}
       </div>
     );

@@ -30,7 +30,7 @@ export default function App() {
 
   const loginTimeoutRef = useRef<any>(null);
 
-  // 1. Initial Auth Check with Heartbeat
+  // 1. Initial Auth Check (The "Heartbeat")
   useEffect(() => {
     const forceStartTimeout = setTimeout(() => {
       if (!isAuthReady) {
@@ -43,10 +43,9 @@ export default function App() {
       clearTimeout(forceStartTimeout);
       setUser(currentUser);
       setIsAuthReady(true);
-      setIsLoggingIn(false);
-      if (loginTimeoutRef.current) {
-        clearTimeout(loginTimeoutRef.current);
-        loginTimeoutRef.current = null;
+      if (currentUser) {
+        setIsLoggingIn(false);
+        if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
       }
     });
 
@@ -56,57 +55,65 @@ export default function App() {
     };
   }, [isAuthReady]);
 
+  // 2. Direct Token Login Logic
   const handleLogin = async () => {
     try {
       setAuthError(null);
       setIsLoggingIn(true);
-      console.log("Starting Login...");
+      console.log("App: Starting Login Process...");
 
-      // 15s Timeout Safety
+      // 20s Safety Timeout for slow university networks
       loginTimeoutRef.current = setTimeout(() => {
-        if (isLoggingIn) {
+        if (isLoggingIn && !user) {
           setIsLoggingIn(false);
-          setAuthError("Sign-in timed out. Please check your internet or Test User settings.");
+          setAuthError("Sign-in timed out. Please check your connection or Google settings.");
         }
-      }, 15000);
+      }, 20000);
 
       if (Capacitor.isNativePlatform()) {
+        // Trigger Native Popup
         const result = await FirebaseAuthentication.signInWithGoogle();
+        console.log("App: Native Result Received");
 
-        if (result.credential?.idToken) {
-          console.log("Tokens received, bridging...");
-          const credential = GoogleAuthProvider.credential(
-            result.credential.idToken,
-            result.credential.accessToken ?? undefined
-          );
-          
-          const userCredential = await signInWithCredential(auth, credential);
-          
-          if (userCredential.user) {
-            console.log("Login Success!");
-            setUser(userCredential.user); // Immediate UI update
-            setIsLoggingIn(false);
-            if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
-          }
+        const idToken = result.credential?.idToken;
+        if (!idToken) {
+          throw new Error("No ID Token received from Google.");
+        }
+
+        // Force-bridge the token to the Web SDK
+        const credential = GoogleAuthProvider.credential(idToken);
+        const userCredential = await signInWithCredential(auth, credential);
+        
+        if (userCredential.user) {
+          console.log("App: Login Successful!");
+          setUser(userCredential.user); // Immediate state update
+          setIsLoggingIn(false);
+          if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
         }
       } else {
+        // Web Fallback
         const { signInWithPopup, GoogleAuthProvider: WebProvider } = await import('firebase/auth');
         await signInWithPopup(auth, new WebProvider());
       }
     } catch (error: any) {
-      console.error("Login Error:", error);
+      console.error("App: Detailed Login Error:", error);
       setIsLoggingIn(false);
       if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
+      
+      // Ignore cancellations
       if (error.message?.includes('cancel') || error.code?.includes('cancelled')) return;
-      setAuthError(`${error.code || 'Error'}: ${error.message || 'Check your Google Cloud credentials'}`);
+      
+      setAuthError(`Code: ${error.code || 'Error'} | Msg: ${error.message || 'Check credentials'}`);
     }
   };
+
+  // --- RENDERING ---
 
   if (!isAuthReady) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white">
         <div className="w-10 h-10 border-4 border-emerald-800 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-gray-500">Connecting to ISOC...</p>
+        <p className="mt-4 text-gray-500 font-medium">Starting ISOC App...</p>
       </div>
     );
   }
@@ -114,8 +121,13 @@ export default function App() {
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
-        <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center overflow-hidden mb-8 shadow-md">
-          <img alt="Logo" className="w-full h-full object-cover" src="./images/ISOC.png" onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} />
+        <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center overflow-hidden mb-8 shadow-lg">
+          <img 
+            alt="Logo" 
+            className="w-full h-full object-cover" 
+            src="./images/ISOC.png" 
+            onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} 
+          />
         </div>
         <h1 className="font-bold text-3xl text-slate-900 mb-2">ISOC Prayer Room</h1>
         <p className="text-slate-500 text-center mb-12">Sign in to access schedules.</p>
@@ -129,8 +141,8 @@ export default function App() {
         </button>
 
         {authError && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-100 rounded-xl text-center">
-            <p className="text-sm text-red-600 font-medium font-body">⚠️ {authError}</p>
+          <div className="mt-6 p-4 bg-red-50 border border-red-100 rounded-xl text-center max-w-xs">
+            <p className="text-xs text-red-600 font-mono break-all">⚠️ {authError}</p>
           </div>
         )}
       </div>

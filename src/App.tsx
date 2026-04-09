@@ -18,6 +18,8 @@ import { InfoScreen } from './components/InfoScreen';
 import { LocationDetailScreen } from './components/LocationDetailScreen';
 import { AppTab } from './types';
 
+const DEFAULT_START_MONTH = 2;
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -26,84 +28,66 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedMonth, setSelectedMonth] = useState<number>(Math.max(new Date().getMonth(), 2));
+  const [selectedMonth, setSelectedMonth] = useState<number>(Math.max(new Date().getMonth(), DEFAULT_START_MONTH));
 
-  const loginTimeoutRef = useRef<any>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 1. Initial Auth Check (The "Heartbeat")
+  // 1. SINGLE SOURCE OF TRUTH: Listen for Auth State
   useEffect(() => {
-    const forceStartTimeout = setTimeout(() => {
-      if (!isAuthReady) {
-        console.warn("Auth check timed out, forcing UI...");
-        setIsAuthReady(true);
-      }
-    }, 5000);
-
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      clearTimeout(forceStartTimeout);
+      console.log('[Auth] State resolved:', currentUser?.email || 'null');
       setUser(currentUser);
       setIsAuthReady(true);
-      if (currentUser) {
-        setIsLoggingIn(false);
-        if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
+      
+      // If we were in a loading state, clear it
+      setIsLoggingIn(false);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
     });
 
-    return () => {
-      unsubscribe();
-      clearTimeout(forceStartTimeout);
-    };
-  }, [isAuthReady]);
+    return () => unsubscribe();
+  }, []);
 
-  // 2. Direct Token Login Logic
   const handleLogin = async () => {
+    setAuthError(null);
+    setIsLoggingIn(true);
+
+    // 15s Safety Net to prevent infinite spinner
+    timeoutRef.current = setTimeout(() => {
+      if (isLoggingIn && !user) {
+        setIsLoggingIn(false);
+        setAuthError("Sign-in timed out. Please check your connection.");
+      }
+    }, 15000);
+
     try {
-      setAuthError(null);
-      setIsLoggingIn(true);
-      console.log("App: Starting Login Process...");
-
-      // 20s Safety Timeout for slow university networks
-      loginTimeoutRef.current = setTimeout(() => {
-        if (isLoggingIn && !user) {
-          setIsLoggingIn(false);
-          setAuthError("Sign-in timed out. Please check your connection or Google settings.");
-        }
-      }, 20000);
-
       if (Capacitor.isNativePlatform()) {
-        // Trigger Native Popup
-        const result = await FirebaseAuthentication.signInWithGoogle();
-        console.log("App: Native Result Received");
+        // Step A: Trigger Native iOS Popup
+        const result = await FirebaseAuthentication.signInWithGoogle({
+          scopes: ['email', 'profile'],
+          skipNativeAuth: false // Plugin handles native session
+        });
 
-        const idToken = result.credential?.idToken;
-        if (!idToken) {
-          throw new Error("No ID Token received from Google.");
-        }
-
-        // Force-bridge the token to the Web SDK
-        const credential = GoogleAuthProvider.credential(idToken);
-        const userCredential = await signInWithCredential(auth, credential);
-        
-        if (userCredential.user) {
-          console.log("App: Login Successful!");
-          setUser(userCredential.user); // Immediate state update
-          setIsLoggingIn(false);
-          if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
+        // Step B: Manual Bridge - Feed token to Web SDK so React "sees" the user
+        if (result.credential?.idToken) {
+          const credential = GoogleAuthProvider.credential(
+            result.credential.idToken,
+            result.credential.accessToken ?? undefined
+          );
+          await signInWithCredential(auth, credential);
         }
       } else {
         // Web Fallback
-        const { signInWithPopup, GoogleAuthProvider: WebProvider } = await import('firebase/auth');
-        await signInWithPopup(auth, new WebProvider());
+        const { signInWithPopup, GoogleAuthProvider: Provider } = await import('firebase/auth');
+        await signInWithPopup(auth, new Provider());
       }
     } catch (error: any) {
-      console.error("App: Detailed Login Error:", error);
       setIsLoggingIn(false);
-      if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
-      
-      // Ignore cancellations
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (error.message?.includes('cancel') || error.code?.includes('cancelled')) return;
-      
-      setAuthError(`Code: ${error.code || 'Error'} | Msg: ${error.message || 'Check credentials'}`);
+      setAuthError(`${error.code || 'Error'}: ${error.message}`);
     }
   };
 
@@ -111,9 +95,11 @@ export default function App() {
 
   if (!isAuthReady) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-        <div className="w-10 h-10 border-4 border-emerald-800 border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-gray-500 font-medium">Starting ISOC App...</p>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-emerald-800 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-sm font-medium text-slate-500">Initializing ISOC...</p>
+        </div>
       </div>
     );
   }
@@ -122,29 +108,18 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
         <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center overflow-hidden mb-8 shadow-lg">
-          <img 
-            alt="Logo" 
-            className="w-full h-full object-cover" 
-            src="./images/ISOC.png" 
-            onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} 
-          />
+          <img alt="Logo" className="w-full h-full object-cover" src="./images/ISOC.png" onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} />
         </div>
         <h1 className="font-bold text-3xl text-slate-900 mb-2">ISOC Prayer Room</h1>
         <p className="text-slate-500 text-center mb-12">Sign in to access schedules.</p>
-        
         <button 
           onClick={handleLogin}
           disabled={isLoggingIn}
-          className="bg-emerald-800 text-white font-bold py-4 px-10 rounded-full shadow-lg w-full max-w-xs active:scale-95 transition-all disabled:opacity-50"
+          className="bg-emerald-800 text-white font-bold py-4 px-10 rounded-full shadow-lg w-full max-w-xs active:scale-95 transition-transform disabled:opacity-50"
         >
           {isLoggingIn ? 'Signing in...' : 'Continue with Google'}
         </button>
-
-        {authError && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-100 rounded-xl text-center max-w-xs">
-            <p className="text-xs text-red-600 font-mono break-all">⚠️ {authError}</p>
-          </div>
-        )}
+        {authError && <p className="mt-6 text-xs text-red-600 font-mono text-center">⚠️ {authError}</p>}
       </div>
     );
   }

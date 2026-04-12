@@ -30,64 +30,62 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedMonth, setSelectedMonth] = useState<number>(Math.max(new Date().getMonth(), DEFAULT_START_MONTH));
 
-  const loginTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 1. Monitor Auth State Changes (The "Heartbeat" Fix)
+  // 1. SINGLE SOURCE OF TRUTH: Global Auth Listener
   useEffect(() => {
-    console.log("Initializing Auth Listener...");
-    
-    // Safety: If Firebase hangs for more than 5 seconds, force the app to show the login screen
-    const forceStartTimeout = setTimeout(() => {
-      if (!isAuthReady) {
-        console.warn("Firebase hang detected. Force-starting UI...");
-        setIsAuthReady(true);
-      }
-    }, 5000);
-
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log("Auth State Changed:", currentUser?.email || "No User");
-      clearTimeout(forceStartTimeout);
+      console.log('[Auth] State resolved:', currentUser?.email || 'Logged Out');
       setUser(currentUser);
-      setIsAuthReady(true);
+      setIsAuthReady(true); // Unlock initialization screen
       
-      // Clear login state if user successfully resolves
       if (currentUser) {
         setIsLoggingIn(false);
-        if (loginTimeoutRef.current) {
-          clearTimeout(loginTimeoutRef.current);
-          loginTimeoutRef.current = null;
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
         }
       }
     });
 
+    // Heartbeat: If Firebase is silent for 6 seconds on load, force-show the UI
+    const forceStart = setTimeout(() => {
+      if (!isAuthReady) {
+        console.warn("[Auth] Initialization heartbeat triggered.");
+        setIsAuthReady(true);
+      }
+    }, 6000);
+
     return () => {
       unsubscribe();
-      clearTimeout(forceStartTimeout);
+      clearTimeout(forceStart);
     };
-  }, []);
+  }, [isAuthReady]);
 
+  // 2. THE LOGIN BRIDGE (Pattern B: Direct Injection)
   const handleLogin = async () => {
     setAuthError(null);
     setIsLoggingIn(true);
 
-    // Safety timeout: If sign-in doesn't finish in 20s, unblock the UI
-    loginTimeoutRef.current = setTimeout(() => {
+    // 20s Safety Timeout for the "Signing in..." state
+    timeoutRef.current = setTimeout(() => {
       if (isLoggingIn && !user) {
         setIsLoggingIn(false);
-        setAuthError("Sign-in timed out. Please check your connection.");
+        setAuthError("Sign-in timed out. Please check your connection or Safari settings.");
       }
     }, 20000);
 
     try {
       if (Capacitor.isNativePlatform()) {
-        // Trigger the Native iOS System Popup
+        // Step A: Trigger Native iOS Google Picker
+        // We use skipNativeAuth: true to avoid the "Bridge Hang"
         const result = await FirebaseAuthentication.signInWithGoogle({
-          scopes: ['email', 'profile'],
-          skipNativeAuth: false,
+          skipNativeAuth: true 
         });
 
-        // Direct Token Bridge: Hand the token to the Firebase Web SDK
+        // Step B: Manual Injection
         if (result.credential?.idToken) {
+          console.log("[Auth] Token received, injecting into Web SDK...");
           const credential = GoogleAuthProvider.credential(
             result.credential.idToken,
             result.credential.accessToken ?? undefined
@@ -96,60 +94,67 @@ export default function App() {
           const userCredential = await signInWithCredential(auth, credential);
           
           if (userCredential.user) {
+            console.log("[Auth] Bridge successful.");
             setUser(userCredential.user);
             setIsLoggingIn(false);
-            if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
           }
         }
-        return;
+      } else {
+        // Browser Fallback
+        const { signInWithPopup, GoogleAuthProvider: Provider } = await import('firebase/auth');
+        await signInWithPopup(auth, new Provider());
       }
-
-      // Web Fallback
-      const { signInWithPopup, GoogleAuthProvider: WebProvider } = await import('firebase/auth');
-      const provider = new WebProvider();
-      await signInWithPopup(auth, provider);
     } catch (error: any) {
+      console.error("[Auth] Login Error:", error);
       setIsLoggingIn(false);
-      if (loginTimeoutRef.current) clearTimeout(loginTimeoutRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      
+      // Don't show error if user just swiped away the popup
       if (error.message?.includes('cancel') || error.code?.includes('cancelled')) return;
-      setAuthError(`${error?.code || 'Error'}: Please try again.`);
+      
+      setAuthError(`${error.code || 'Error'}: ${error.message}`);
     }
   };
 
+  // --- RENDERING ---
+
   if (!isAuthReady) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-sm text-on-surface-variant font-medium">Starting ISOC App...</p>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-emerald-800 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-sm font-medium text-slate-500">Connecting to ISOC...</p>
+        </div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6">
-        <div className="w-24 h-24 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden mb-8 shadow-xl">
-          <img
-            alt="ISOC Logo"
-            className="w-full h-full object-cover"
-            src="./images/ISOC.png"
-            onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")}
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
+        <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center overflow-hidden mb-8 shadow-lg">
+          <img 
+            alt="Logo" 
+            className="w-full h-full object-cover" 
+            src="./images/ISOC.png" 
+            onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} 
           />
         </div>
-        <h1 className="font-headline font-extrabold text-3xl text-on-surface mb-2">ISOC Prayer Room</h1>
-        <p className="font-body text-on-surface-variant text-center mb-12">Sign in to access schedules.</p>
-
-        <button
+        <h1 className="font-bold text-3xl text-slate-900 mb-2 text-center">ISOC Prayer Room</h1>
+        <p className="text-slate-500 text-center mb-12">Sign in to access schedules.</p>
+        
+        <button 
           onClick={handleLogin}
           disabled={isLoggingIn}
-          className="bg-primary text-on-primary font-headline font-bold py-4 px-8 rounded-full shadow-lg w-full max-w-xs active:scale-95 transition-transform disabled:opacity-50"
+          className="bg-emerald-800 text-white font-bold py-4 px-10 rounded-full shadow-lg w-full max-w-xs active:scale-95 transition-transform disabled:opacity-50"
         >
           {isLoggingIn ? 'Signing in...' : 'Continue with Google'}
         </button>
 
         {authError && (
-          <div className="mt-6 p-3 bg-red-50 border border-red-100 rounded-lg">
-            <p className="text-sm text-red-600 text-center font-medium">⚠️ {authError}</p>
+          <div className="mt-6 p-4 bg-red-50 border border-red-100 rounded-xl text-center max-w-xs">
+            <p className="text-xs text-red-600 font-mono break-all font-medium">⚠️ {authError}</p>
           </div>
         )}
       </div>

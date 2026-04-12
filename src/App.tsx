@@ -9,6 +9,7 @@ import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth } from './firebase';
 
+// Components
 import { Layout } from './components/Layout';
 import { HomeScreen } from './components/HomeScreen';
 import { ScheduleScreen } from './components/ScheduleScreen';
@@ -31,7 +32,7 @@ export default function App() {
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 1. Monitor Auth State Changes
+  // 1. Global Auth State Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -46,28 +47,33 @@ export default function App() {
       }
     });
 
-    const forceReady = setTimeout(() => setIsAuthReady(true), 5000);
+    // Safety Heartbeat to unlock splash screen
+    const forceStart = setTimeout(() => {
+      if (!isAuthReady) setIsAuthReady(true);
+    }, 5000);
+
     return () => {
       unsubscribe();
-      clearTimeout(forceReady);
+      clearTimeout(forceStart);
     };
-  }, []);
+  }, [isAuthReady]);
 
-  // 2. The Corrected Login Bridge
+  // 2. The Finalized Login Bridge
   const handleLogin = async () => {
     setAuthError(null);
     setIsLoggingIn(true);
 
-    // Fixed Timeout: Simply triggers if not cleared by success
+    // Safety Timeout (Fixed closure logic)
     timeoutRef.current = setTimeout(() => {
       setIsLoggingIn(false);
-      setAuthError("Sign-in timed out. Please check your connection.");
+      setAuthError("Sign-in timed out. Please check your internet connection.");
     }, 25000);
 
     try {
       if (Capacitor.isNativePlatform()) {
+        // Step A: Trigger Native iOS Google Picker
         const result = await FirebaseAuthentication.signInWithGoogle({
-          skipNativeAuth: true // AGREES WITH CONFIG
+          skipNativeAuth: true 
         });
 
         if (result.credential?.idToken) {
@@ -76,22 +82,35 @@ export default function App() {
             result.credential.accessToken ?? undefined
           );
           
+          // Step B: Handshake with Firebase Web SDK
           const userCredential = await signInWithCredential(auth, credential);
           
           if (userCredential.user) {
+            // Force state update to bypass any listener lag
             setUser(userCredential.user);
             setIsLoggingIn(false);
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
           }
         }
       } else {
+        // Browser Fallback
         const { signInWithPopup, GoogleAuthProvider: Provider } = await import('firebase/auth');
         await signInWithPopup(auth, new Provider());
       }
     } catch (error: any) {
+      console.error("[Auth Error]", error);
       setIsLoggingIn(false);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
+      // Don't show error if user cancelled the popup
       if (error.message?.includes('cancel') || error.code?.includes('cancelled')) return;
+      
       setAuthError(`${error.code || 'Error'}: ${error.message}`);
     }
   };
@@ -113,7 +132,12 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
         <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center overflow-hidden mb-8 shadow-lg">
-          <img alt="Logo" className="w-full h-full object-cover" src="./images/ISOC.png" onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} />
+          <img 
+            alt="Logo" 
+            className="w-full h-full object-cover" 
+            src="./images/ISOC.png" 
+            onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} 
+          />
         </div>
         <h1 className="font-bold text-3xl text-slate-900 mb-2 text-center">ISOC Prayer Room</h1>
         <p className="text-slate-500 text-center mb-12">Sign in to access schedules.</p>
@@ -121,7 +145,7 @@ export default function App() {
         <button 
           onClick={handleLogin}
           disabled={isLoggingIn}
-          className="bg-emerald-800 text-white font-bold py-4 px-10 rounded-full shadow-lg w-full max-w-xs active:scale-95 disabled:opacity-50"
+          className="bg-emerald-800 text-white font-bold py-4 px-10 rounded-full shadow-lg w-full max-w-xs active:scale-95 transition-transform disabled:opacity-50"
         >
           {isLoggingIn ? 'Signing in...' : 'Continue with Google'}
         </button>

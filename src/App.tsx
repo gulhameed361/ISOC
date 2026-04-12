@@ -23,7 +23,7 @@ const DEFAULT_START_MONTH = 2;
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [loginStatus, setLoginStatus] = useState<'idle' | 'popup' | 'token' | 'bridging'>('idle');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
@@ -32,69 +32,58 @@ export default function App() {
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 1. Monitor Auth State Changes
+  // 1. Monitor Auth State
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log('[Auth] Global listener detected user:', currentUser?.email || 'null');
       setUser(currentUser);
       setIsAuthReady(true);
       if (currentUser) {
-        setLoginStatus('idle');
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
+        setIsLoggingIn(false);
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
       }
     });
 
-    // Heartbeat: Force-unlock the loading circle after 4 seconds
-    const forceStart = setTimeout(() => {
-      if (!isAuthReady) setIsAuthReady(true);
-    }, 4000);
+    // Safety: Unlock screen after 5 seconds regardless of Firebase status
+    const forceReady = setTimeout(() => setIsAuthReady(true), 5000);
 
     return () => {
       unsubscribe();
-      clearTimeout(forceStart);
+      clearTimeout(forceReady);
     };
-  }, [isAuthReady]);
+  }, []);
 
-  // 2. The Login Diagnostic Flow
+  // 2. Login Logic
   const handleLogin = async () => {
     setAuthError(null);
-    setLoginStatus('popup'); // Step 1: UI shows "Opening Google..."
+    setIsLoggingIn(true);
 
-    // 25s Safety Timeout
+    // Safety timeout for the "Connecting" state
     timeoutRef.current = setTimeout(() => {
-      if (loginStatus !== 'idle' && !user) {
-        setLoginStatus('idle');
-        setAuthError("Sign-in timed out. Check if your iPhone allows 'Cross-Website Tracking' in Safari settings.");
+      if (isLoggingIn && !user) {
+        setIsLoggingIn(false);
+        setAuthError("Connection timed out. Please check your internet or try again.");
       }
-    }, 25000);
+    }, 20000);
 
     try {
       if (Capacitor.isNativePlatform()) {
-        // A. Call Native Popup
+        // Native Google Sign In
         const result = await FirebaseAuthentication.signInWithGoogle({
           skipNativeAuth: true 
         });
-        
-        // B. If we reach here, the popup closed successfully
-        setLoginStatus('token'); 
-        
+
         if (result.credential?.idToken) {
-          setLoginStatus('bridging'); // Step 3: UI shows "Connecting to App..."
-          
           const credential = GoogleAuthProvider.credential(
             result.credential.idToken,
             result.credential.accessToken ?? undefined
           );
           
-          // C. Handshake with Firebase Web SDK
+          // Inject into Web SDK (This failed before due to wrong API Key)
           const userCredential = await signInWithCredential(auth, credential);
           
           if (userCredential.user) {
             setUser(userCredential.user);
-            setLoginStatus('idle');
+            setIsLoggingIn(false);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
           }
         }
@@ -104,13 +93,13 @@ export default function App() {
         await signInWithPopup(auth, new Provider());
       }
     } catch (error: any) {
-      console.error("[Auth Error]", error);
-      setLoginStatus('idle');
+      console.error("Auth Error:", error);
+      setIsLoggingIn(false);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       
       if (error.message?.includes('cancel') || error.code?.includes('cancelled')) return;
       
-      setAuthError(`[${error.code || 'Error'}]: ${error.message}`);
+      setAuthError(`${error.code || 'Error'}: ${error.message}`);
     }
   };
 
@@ -121,7 +110,7 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-4 border-emerald-800 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm font-medium text-slate-500">Connecting...</p>
+          <p className="text-sm font-medium text-slate-500">Initializing...</p>
         </div>
       </div>
     );
@@ -131,25 +120,17 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
         <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center overflow-hidden mb-8 shadow-lg">
-          <img 
-            alt="Logo" 
-            className="w-full h-full object-cover" 
-            src="./images/ISOC.png" 
-            onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} 
-          />
+          <img alt="Logo" className="w-full h-full object-cover" src="./images/ISOC.png" onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} />
         </div>
-        <h1 className="font-bold text-3xl text-slate-900 mb-2 text-center">ISOC Prayer Room</h1>
+        <h1 className="font-bold text-3xl text-slate-900 mb-2">ISOC Prayer Room</h1>
         <p className="text-slate-500 text-center mb-12">Sign in to access schedules.</p>
         
         <button 
           onClick={handleLogin}
-          disabled={loginStatus !== 'idle'}
+          disabled={isLoggingIn}
           className="bg-emerald-800 text-white font-bold py-4 px-10 rounded-full shadow-lg w-full max-w-xs active:scale-95 transition-transform disabled:opacity-50"
         >
-          {loginStatus === 'popup' && 'Opening Google...'}
-          {loginStatus === 'token' && 'Verifying Token...'}
-          {loginStatus === 'bridging' && 'Connecting to App...'}
-          {loginStatus === 'idle' && 'Continue with Google'}
+          {isLoggingIn ? 'Signing in...' : 'Continue with Google'}
         </button>
 
         {authError && (

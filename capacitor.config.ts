@@ -12,7 +12,7 @@ const config: CapacitorConfig = {
   plugins: {
     FirebaseAuthentication: {
       // Must be false to use the Native iOS popup and SHA-1 fingerprint
-      skipNativeAuth: false,
+      skipNativeAuth: true,
       providers: ['google.com'],
     },
   },

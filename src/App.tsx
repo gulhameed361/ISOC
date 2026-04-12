@@ -35,15 +35,20 @@ export default function App() {
   // 1. Monitor Auth State
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log('[Auth] User updated:', currentUser?.email || 'Logged Out');
       setUser(currentUser);
       setIsAuthReady(true);
+      
       if (currentUser) {
         setIsLoggingIn(false);
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
       }
     });
 
-    // Safety: Unlock screen after 5 seconds regardless of Firebase status
+    // Safety: Unlock initialization screen after 5 seconds
     const forceReady = setTimeout(() => setIsAuthReady(true), 5000);
 
     return () => {
@@ -52,33 +57,34 @@ export default function App() {
     };
   }, []);
 
-  // 2. Login Logic
+  // 2. The Final Login Bridge
   const handleLogin = async () => {
     setAuthError(null);
     setIsLoggingIn(true);
 
-    // Safety timeout for the "Connecting" state
+    // Safety timeout for the "Signing in..." state
     timeoutRef.current = setTimeout(() => {
       if (isLoggingIn && !user) {
         setIsLoggingIn(false);
-        setAuthError("Connection timed out. Please check your internet or try again.");
+        setAuthError("Sign-in timed out. Ensure localhost is an Authorized Domain in Firebase.");
       }
-    }, 20000);
+    }, 25000);
 
     try {
       if (Capacitor.isNativePlatform()) {
-        // Native Google Sign In
+        // A. Trigger Native Popup (skipNativeAuth: true is critical for bridge stability)
         const result = await FirebaseAuthentication.signInWithGoogle({
           skipNativeAuth: true 
         });
 
         if (result.credential?.idToken) {
+          console.log("[Auth] Token received. Bridging to Web SDK...");
           const credential = GoogleAuthProvider.credential(
             result.credential.idToken,
             result.credential.accessToken ?? undefined
           );
           
-          // Inject into Web SDK (This failed before due to wrong API Key)
+          // B. This will now succeed with the correct API Key
           const userCredential = await signInWithCredential(auth, credential);
           
           if (userCredential.user) {
@@ -88,12 +94,12 @@ export default function App() {
           }
         }
       } else {
-        // Web Fallback
+        // Browser Fallback
         const { signInWithPopup, GoogleAuthProvider: Provider } = await import('firebase/auth');
         await signInWithPopup(auth, new Provider());
       }
     } catch (error: any) {
-      console.error("Auth Error:", error);
+      console.error("[Auth] Login error:", error);
       setIsLoggingIn(false);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       
@@ -110,7 +116,7 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-4 border-emerald-800 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm font-medium text-slate-500">Initializing...</p>
+          <p className="text-sm font-medium text-slate-500">Connecting to ISOC...</p>
         </div>
       </div>
     );
@@ -120,10 +126,15 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
         <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center overflow-hidden mb-8 shadow-lg">
-          <img alt="Logo" className="w-full h-full object-cover" src="./images/ISOC.png" onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} />
+          <img 
+            alt="Logo" 
+            className="w-full h-full object-cover" 
+            src="./images/ISOC.png" 
+            onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} 
+          />
         </div>
-        <h1 className="font-bold text-3xl text-slate-900 mb-2">ISOC Prayer Room</h1>
-        <p className="text-slate-500 text-center mb-12">Sign in to access schedules.</p>
+        <h1 className="font-bold text-3xl text-slate-900 mb-2 text-center">ISOC Prayer Room</h1>
+        <p className="text-slate-500 text-center mb-12 text-balance">Sign in to access your prayer schedule.</p>
         
         <button 
           onClick={handleLogin}

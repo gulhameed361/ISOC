@@ -18,8 +18,6 @@ import { InfoScreen } from './components/InfoScreen';
 import { LocationDetailScreen } from './components/LocationDetailScreen';
 import { AppTab } from './types';
 
-const DEFAULT_START_MONTH = 2;
-
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -28,153 +26,89 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedMonth, setSelectedMonth] = useState<number>(Math.max(new Date().getMonth(), DEFAULT_START_MONTH));
+  const [selectedMonth, setSelectedMonth] = useState<number>(Math.max(new Date().getMonth(), 2));
 
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<any>(null);
+  const isAuthReadyRef = useRef(false);
 
-  // 1. Global Auth State Listener
+  // 1. Monitor Auth State (Fixed dependency array)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsAuthReady(true);
-      
-      if (currentUser) {
-        setIsLoggingIn(false);
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-      }
+      isAuthReadyRef.current = true;
+      if (currentUser) setIsLoggingIn(false);
     });
 
-    // Safety Heartbeat to unlock splash screen
     const forceStart = setTimeout(() => {
-      if (!isAuthReady) setIsAuthReady(true);
+      if (!isAuthReadyRef.current) setIsAuthReady(true);
     }, 5000);
 
     return () => {
       unsubscribe();
       clearTimeout(forceStart);
     };
-  }, [isAuthReady]);
+  }, []); // Empty array is critical here!
 
-  // 2. The Finalized Login Bridge
   const handleLogin = async () => {
     setAuthError(null);
     setIsLoggingIn(true);
 
-    // Safety Timeout (Fixed closure logic)
-    timeoutRef.current = setTimeout(() => {
-      setIsLoggingIn(false);
-      setAuthError("Sign-in timed out. Please check your internet connection.");
-    }, 25000);
-
     try {
       if (Capacitor.isNativePlatform()) {
-        // Step A: Trigger Native iOS Google Picker
         const result = await FirebaseAuthentication.signInWithGoogle({
           skipNativeAuth: true 
         });
 
         if (result.credential?.idToken) {
-          const credential = GoogleAuthProvider.credential(
-            result.credential.idToken,
-            result.credential.accessToken ?? undefined
-          );
-          
-          // Step B: Handshake with Firebase Web SDK
+          const credential = GoogleAuthProvider.credential(result.credential.idToken);
           const userCredential = await signInWithCredential(auth, credential);
           
           if (userCredential.user) {
-            // Force state update to bypass any listener lag
             setUser(userCredential.user);
             setIsLoggingIn(false);
-            if (timeoutRef.current) {
-              clearTimeout(timeoutRef.current);
-              timeoutRef.current = null;
-            }
           }
         }
       } else {
-        // Browser Fallback
         const { signInWithPopup, GoogleAuthProvider: Provider } = await import('firebase/auth');
         await signInWithPopup(auth, new Provider());
       }
     } catch (error: any) {
-      console.error("[Auth Error]", error);
       setIsLoggingIn(false);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      
-      // Don't show error if user cancelled the popup
       if (error.message?.includes('cancel') || error.code?.includes('cancelled')) return;
-      
       setAuthError(`${error.code || 'Error'}: ${error.message}`);
     }
   };
 
-  // --- RENDERING ---
-
   if (!isAuthReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-4 border-emerald-800 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm font-medium text-slate-500">Connecting...</p>
-        </div>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center bg-white"><div className="animate-spin h-8 w-8 border-4 border-emerald-800 border-t-transparent rounded-full"></div></div>;
   }
 
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
-        <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center overflow-hidden mb-8 shadow-lg">
-          <img 
-            alt="Logo" 
-            className="w-full h-full object-cover" 
-            src="./images/ISOC.png" 
-            onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150")} 
-          />
+        <div className="w-24 h-24 mb-8 shadow-lg rounded-full overflow-hidden bg-white flex items-center justify-center">
+          <img alt="Logo" className="w-full h-full object-cover" src="./images/ISOC.png" />
         </div>
-        <h1 className="font-bold text-3xl text-slate-900 mb-2 text-center">ISOC Prayer Room</h1>
-        <p className="text-slate-500 text-center mb-12">Sign in to access schedules.</p>
-        
+        <h1 className="font-bold text-3xl text-slate-900 mb-2">ISOC Prayer Room</h1>
         <button 
           onClick={handleLogin}
           disabled={isLoggingIn}
-          className="bg-emerald-800 text-white font-bold py-4 px-10 rounded-full shadow-lg w-full max-w-xs active:scale-95 transition-transform disabled:opacity-50"
+          className="bg-emerald-800 text-white font-bold py-4 px-10 rounded-full w-full max-w-xs active:scale-95 disabled:opacity-50"
         >
           {isLoggingIn ? 'Signing in...' : 'Continue with Google'}
         </button>
-
-        {authError && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-100 rounded-xl text-center max-w-xs">
-            <p className="text-xs text-red-600 font-mono break-all font-medium">⚠️ {authError}</p>
-          </div>
-        )}
+        {authError && <p className="mt-6 text-xs text-red-600 text-center px-4">⚠️ {authError}</p>}
       </div>
     );
   }
 
-  const renderScreen = () => {
-    if (activeTab === 'info' && selectedLocationId) {
-      return <LocationDetailScreen locationId={selectedLocationId} onBack={() => setSelectedLocationId(null)} />;
-    }
-    switch (activeTab) {
-      case 'home': return <HomeScreen onViewCalendar={() => setActiveTab('schedule')} selectedDate={selectedDate} onDateChange={setSelectedDate} />;
-      case 'schedule': return <ScheduleScreen selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} onDateChange={(date) => { setSelectedDate(date); setActiveTab('home'); }} />;
-      case 'scan': return <ScanScreen />;
-      case 'info': return <InfoScreen onLocationClick={setSelectedLocationId} />;
-      default: return <HomeScreen />;
-    }
-  };
-
   return (
     <Layout activeTab={activeTab} onTabChange={setActiveTab}>
-      {renderScreen()}
+      {activeTab === 'home' && <HomeScreen onViewCalendar={() => setActiveTab('schedule')} selectedDate={selectedDate} onDateChange={setSelectedDate} />}
+      {activeTab === 'schedule' && <ScheduleScreen selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} onDateChange={(d) => { setSelectedDate(d); setActiveTab('home'); }} />}
+      {activeTab === 'scan' && <ScanScreen />}
+      {activeTab === 'info' && (selectedLocationId ? <LocationDetailScreen locationId={selectedLocationId} onBack={() => setSelectedLocationId(null)} /> : <InfoScreen onLocationClick={setSelectedLocationId} />)}
     </Layout>
   );
 }

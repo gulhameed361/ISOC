@@ -23,7 +23,7 @@ const DEFAULT_START_MONTH = 2;
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginStatus, setLoginStatus] = useState<'idle' | 'popup' | 'token' | 'bridging'>('idle');
   const [authError, setAuthError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
@@ -32,15 +32,14 @@ export default function App() {
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 1. SINGLE SOURCE OF TRUTH: Global Auth Listener
+  // 1. Monitor Auth State Changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      console.log('[Auth] State resolved:', currentUser?.email || 'Logged Out');
+      console.log('[Auth] Global listener detected user:', currentUser?.email || 'null');
       setUser(currentUser);
-      setIsAuthReady(true); // Unlock initialization screen
-      
+      setIsAuthReady(true);
       if (currentUser) {
-        setIsLoggingIn(false);
+        setLoginStatus('idle');
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
@@ -48,13 +47,10 @@ export default function App() {
       }
     });
 
-    // Heartbeat: If Firebase is silent for 6 seconds on load, force-show the UI
+    // Heartbeat: Force-unlock the loading circle after 4 seconds
     const forceStart = setTimeout(() => {
-      if (!isAuthReady) {
-        console.warn("[Auth] Initialization heartbeat triggered.");
-        setIsAuthReady(true);
-      }
-    }, 6000);
+      if (!isAuthReady) setIsAuthReady(true);
+    }, 4000);
 
     return () => {
       unsubscribe();
@@ -62,58 +58,59 @@ export default function App() {
     };
   }, [isAuthReady]);
 
-  // 2. THE LOGIN BRIDGE (Pattern B: Direct Injection)
+  // 2. The Login Diagnostic Flow
   const handleLogin = async () => {
     setAuthError(null);
-    setIsLoggingIn(true);
+    setLoginStatus('popup'); // Step 1: UI shows "Opening Google..."
 
-    // 20s Safety Timeout for the "Signing in..." state
+    // 25s Safety Timeout
     timeoutRef.current = setTimeout(() => {
-      if (isLoggingIn && !user) {
-        setIsLoggingIn(false);
-        setAuthError("Sign-in timed out. Please check your connection or Safari settings.");
+      if (loginStatus !== 'idle' && !user) {
+        setLoginStatus('idle');
+        setAuthError("Sign-in timed out. Check if your iPhone allows 'Cross-Website Tracking' in Safari settings.");
       }
-    }, 20000);
+    }, 25000);
 
     try {
       if (Capacitor.isNativePlatform()) {
-        // Step A: Trigger Native iOS Google Picker
-        // We use skipNativeAuth: true to avoid the "Bridge Hang"
+        // A. Call Native Popup
         const result = await FirebaseAuthentication.signInWithGoogle({
           skipNativeAuth: true 
         });
-
-        // Step B: Manual Injection
+        
+        // B. If we reach here, the popup closed successfully
+        setLoginStatus('token'); 
+        
         if (result.credential?.idToken) {
-          console.log("[Auth] Token received, injecting into Web SDK...");
+          setLoginStatus('bridging'); // Step 3: UI shows "Connecting to App..."
+          
           const credential = GoogleAuthProvider.credential(
             result.credential.idToken,
             result.credential.accessToken ?? undefined
           );
           
+          // C. Handshake with Firebase Web SDK
           const userCredential = await signInWithCredential(auth, credential);
           
           if (userCredential.user) {
-            console.log("[Auth] Bridge successful.");
             setUser(userCredential.user);
-            setIsLoggingIn(false);
+            setLoginStatus('idle');
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
           }
         }
       } else {
-        // Browser Fallback
+        // Web Fallback
         const { signInWithPopup, GoogleAuthProvider: Provider } = await import('firebase/auth');
         await signInWithPopup(auth, new Provider());
       }
     } catch (error: any) {
-      console.error("[Auth] Login Error:", error);
-      setIsLoggingIn(false);
+      console.error("[Auth Error]", error);
+      setLoginStatus('idle');
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       
-      // Don't show error if user just swiped away the popup
       if (error.message?.includes('cancel') || error.code?.includes('cancelled')) return;
       
-      setAuthError(`${error.code || 'Error'}: ${error.message}`);
+      setAuthError(`[${error.code || 'Error'}]: ${error.message}`);
     }
   };
 
@@ -124,7 +121,7 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-4 border-emerald-800 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm font-medium text-slate-500">Connecting to ISOC...</p>
+          <p className="text-sm font-medium text-slate-500">Connecting...</p>
         </div>
       </div>
     );
@@ -146,10 +143,13 @@ export default function App() {
         
         <button 
           onClick={handleLogin}
-          disabled={isLoggingIn}
+          disabled={loginStatus !== 'idle'}
           className="bg-emerald-800 text-white font-bold py-4 px-10 rounded-full shadow-lg w-full max-w-xs active:scale-95 transition-transform disabled:opacity-50"
         >
-          {isLoggingIn ? 'Signing in...' : 'Continue with Google'}
+          {loginStatus === 'popup' && 'Opening Google...'}
+          {loginStatus === 'token' && 'Verifying Token...'}
+          {loginStatus === 'bridging' && 'Connecting to App...'}
+          {loginStatus === 'idle' && 'Continue with Google'}
         </button>
 
         {authError && (

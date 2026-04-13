@@ -21,6 +21,8 @@ jobs:
 
       - name: Build Web Project
         run: npm run build
+        env:
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
 
       - name: Sync and Copy Capacitor
         run: |
